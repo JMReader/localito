@@ -2,8 +2,8 @@
   "meta": {
     "feature_id": "localito",
     "document_type": "functional_specification",
-    "status": "pending_approval",
-    "version": "0.1.0-draft",
+    "status": "approved",
+    "version": "0.1.0",
     "language": "es-AR",
     "created": "2026-11-07",
     "title": "Localito — Especificación funcional (MVP)",
@@ -17,16 +17,30 @@
       "title": "TwinLocal — Documento de producto (v0.1)",
       "document_id": "twinlocal-producto-v0.1",
       "status_in_source": "borrador para arrancar",
-      "consulted_copy": "C:/Users/angel/Desktop/todo/boveda notebook/projects/hackatwins/docs/twinlocal-producto-v0.1.md",
+      "consulted_copy": "docs/twinlocal-producto-v0.1.md",
       "expected_repo_path": "docs/twinlocal-producto-v0.1.md",
       "repo_copy_available_at_drafting_time": false,
-      "note": "Copia del repositorio no presente en este checkout; se usó la copia del cerebro indicada. El documento fuente sigue siendo la fuente de verdad."
+      "repo_copy_added": "2026-11-07",
+      "sha256": "7815dacc00ed74bc6d3b082fb04bfcabefab130022d25336b4bf86985f846231",
+      "original_consulted_copy": "C:/Users/angel/Desktop/todo/boveda notebook/projects/hackatwins/docs/twinlocal-producto-v0.1.md",
+      "note": "Copia verbatim incorporada al repo en docs/twinlocal-producto-v0.1.md. El documento fuente sigue siendo la fuente de verdad."
+    },
+    "approval": {
+      "approved_at": "2026-11-07",
+      "approved_by": "usuario (mdf-angel)",
+      "channel": "conversación con el agente (OpenCode)",
+      "evidence": "Aprobación verbal; no hay issue ni firma.",
+      "scope": "functional_specification",
+      "deferred_to_decision_with_oky": ["O1", "O2", "O3", "O4", "G01", "G03", "G04"]
     },
     "gate": {
-      "stage": "functional",
+      "stage": "technical",
+      "functional_approved": true,
       "next_document": "technical-spec.json",
       "requires_explicit_user_approval": true,
-      "implementation_blocked": true
+      "implementation_blocked": false,
+      "implementation_scope_approved": "flujo mínimo demostrable: registro, saldo, pago e historial",
+      "full_scope_blocked_until": "technical-spec.json y todos.json aprobados explícitamente"
     },
     "labels": {
       "DECIDIDO": "Decisión ya tomada en el documento fuente.",
@@ -1211,7 +1225,7 @@
     {
       "id": "UC-16",
       "title": "Cobro de cuota de membresía",
-      "actors": ["A05", "A01", "A02", "A03"],
+      "actors": ["A05", "A01", "A02", "A03", "A08"],
       "goal": "Cobrar la cuota mensual escalonada y registrarla como ingreso.",
       "preconditions": ["El miembro está activo.", "Corresponde el período mensual."],
       "main_flow": [
@@ -1590,6 +1604,14 @@
       "when": "el operador consulta la auditoría",
       "then": "encuentra quién lo hizo, cuándo y los valores anterior y nuevo, sin datos personales expuestos en el registro público del circuito",
       "traces_to": ["S02", "S14", "UC-19", "BR-ACC-03", "BR-MEM-03", "BR-SEC-03"]
+    },
+    {
+      "id": "AC-27",
+      "title": "Simulación reproducible del piloto",
+      "given": "un escenario de simulación con parámetros del piloto",
+      "when": "el operador ejecuta el escenario y exporta los resultados",
+      "then": "obtiene métricas reproducibles de success_metrics_pilot con los parámetros usados y la fecha de ejecución, identificadas como simuladas",
+      "traces_to": ["S18", "UC-20"]
     }
   ],
   "ux_expectations": {
@@ -1822,11 +1844,13 @@
     {
       "scope": "S18",
       "use_cases": ["UC-20"],
-      "acceptance_criteria": []
+      "acceptance_criteria": ["AC-27"]
     }
   ],
   "review_notes": {
-    "ready_for_approval": false,
+    "ready_for_approval": true,
+    "approval_status": "approved_in_conversation",
+    "blocking_points_status": "derivados a decisión con oky; no bloquean la aprobación funcional ni el flujo mínimo, sí el alcance completo.",
     "blocking_points": [
       "O1 unidad de cuenta: todo monto y plazo depende de esta decisión.",
       "O2 plazo de saldado: P01 es solo un valor inicial.",
@@ -1845,6 +1869,6 @@
       "D3 y D4 del documento fuente, por ser decisiones de implementación.",
       "Colateral, transferencias externas, off-ramp para miembros, demurrage y WhatsApp: conceptos de un modelo anterior que no forman parte de esta spec."
     ],
-    "next_step": "Aprobación explícita del usuario para avanzar a technical-spec.json."
+    "next_step": "Generar technical-spec.json y todos.json; arrancar el flujo mínimo con backend y frontend en paralelo."
   }
 }
