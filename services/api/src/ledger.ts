@@ -3,7 +3,8 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import {
   CURRENCY,
-  findParticipantByAliasOrId,
+  MAX_IDEMPOTENCY_KEY_LENGTH,
+  findParticipantByAlias,
   findParticipantById,
   participantView,
 } from './db.js';
@@ -88,7 +89,11 @@ function party(row: ParticipantRow | undefined, fallbackId: string): Transaction
   };
 }
 
-export function buildTransactionView(db: DatabaseSync, transaction: TransactionRow): TransactionView {
+export function buildTransactionView(
+  db: DatabaseSync,
+  transaction: TransactionRow,
+  viewerId: string = transaction.from_id,
+): TransactionView {
   const from = findParticipantById(db, transaction.from_id);
   const to = findParticipantById(db, transaction.to_id);
   const entries = db
@@ -100,6 +105,10 @@ export function buildTransactionView(db: DatabaseSync, transaction: TransactionR
   const toBalance =
     entries.find((entry) => entry.participant_id === transaction.to_id)?.balance_after_cents ?? 0;
 
+  const viewerIsSender = viewerId === transaction.from_id;
+  const balanceAfter = viewerIsSender ? fromBalance : toBalance;
+  const counterpartyBalanceAfter = viewerIsSender ? toBalance : fromBalance;
+
   return {
     id: transaction.id,
     status: transaction.status,
@@ -109,8 +118,8 @@ export function buildTransactionView(db: DatabaseSync, transaction: TransactionR
     to: party(to, transaction.to_id),
     note: transaction.note,
     created_at: transaction.created_at,
-    balance_after_cents: fromBalance,
-    counterparty_balance_after_cents: toBalance,
+    balance_after_cents: balanceAfter,
+    counterparty_balance_after_cents: counterpartyBalanceAfter,
   };
 }
 
@@ -124,6 +133,44 @@ function findTransactionByIdempotency(
     .get(fromId, idempotencyKey) as TransactionRow | undefined;
 }
 
+export function isIdempotencyUniqueViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : '';
+  return /unique constraint failed: transactions\.from_id, transactions\.idempotency_key/i.test(
+    message,
+  );
+}
+
+function samePayload(
+  existing: TransactionRow,
+  receiverId: string,
+  input: PayInput,
+): boolean {
+  return (
+    existing.to_id === receiverId &&
+    existing.amount_cents === input.amountCents &&
+    (existing.note ?? null) === (input.note ?? null)
+  );
+}
+
+export function replayOrConflict(
+  db: DatabaseSync,
+  existing: TransactionRow,
+  receiverId: string,
+  input: PayInput,
+): PayResult {
+  if (!samePayload(existing, receiverId, input)) {
+    throw new ApiError(
+      409,
+      'IDEMPOTENCY_CONFLICT',
+      'Esa clave de idempotencia ya se usó para otro pago.',
+    );
+  }
+  return {
+    transaction: buildTransactionView(db, existing, input.fromId),
+    idempotentReplay: true,
+  };
+}
+
 function setBalance(db: DatabaseSync, participantId: string, balanceCents: number): void {
   db.prepare('UPDATE participants SET balance_cents = ? WHERE id = ?').run(balanceCents, participantId);
 }
@@ -134,21 +181,31 @@ function insertLedgerEntry(
   participantId: string,
   deltaCents: number,
   balanceAfterCents: number,
+  kind: 'payment_out' | 'payment_in',
   createdAt: string,
 ): void {
   db.prepare(`
-    INSERT INTO ledger_entries (transaction_id, participant_id, delta_cents, balance_after_cents, created_at)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(transactionId, participantId, deltaCents, balanceAfterCents, createdAt);
+    INSERT INTO ledger_entries
+      (transaction_id, participant_id, delta_cents, balance_after_cents, kind, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(transactionId, participantId, deltaCents, balanceAfterCents, kind, createdAt);
 }
 
 export function pay(db: DatabaseSync, input: PayInput): PayResult {
   if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) {
     throw new ApiError(422, 'VALIDATION_ERROR', 'El monto debe ser un entero mayor a cero.');
   }
+  if (input.idempotencyKey && input.idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
+    throw new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      `La clave de idempotencia no puede superar los ${MAX_IDEMPOTENCY_KEY_LENGTH} caracteres.`,
+    );
+  }
 
   return withTransaction(db, () => {
-    const receiver = findParticipantByAliasOrId(db, input.toIdentifier);
+    // El contrato acepta el alias del destinatario, no su id interno.
+    const receiver = findParticipantByAlias(db, input.toIdentifier);
     if (!receiver) {
       throw new ApiError(404, 'NOT_FOUND', 'No encontramos a ese participante.');
     }
@@ -159,18 +216,7 @@ export function pay(db: DatabaseSync, input: PayInput): PayResult {
     if (input.idempotencyKey) {
       const existing = findTransactionByIdempotency(db, input.fromId, input.idempotencyKey);
       if (existing) {
-        const samePayload =
-          existing.to_id === receiver.id &&
-          existing.amount_cents === input.amountCents &&
-          (existing.note ?? null) === (input.note ?? null);
-        if (!samePayload) {
-          throw new ApiError(
-            409,
-            'IDEMPOTENCY_CONFLICT',
-            'Esa clave de idempotencia ya se usó para otro pago.',
-          );
-        }
-        return { transaction: buildTransactionView(db, existing), idempotentReplay: true };
+        return replayOrConflict(db, existing, receiver.id, input);
       }
     }
 
@@ -227,31 +273,55 @@ export function pay(db: DatabaseSync, input: PayInput): PayResult {
       created_at: createdAt,
     };
 
-    db.prepare(`
-      INSERT INTO transactions
-        (id, from_id, to_id, amount_cents, currency, note, status, idempotency_key, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      transaction.id,
-      transaction.from_id,
-      transaction.to_id,
-      transaction.amount_cents,
-      transaction.currency,
-      transaction.note,
-      transaction.status,
-      transaction.idempotency_key,
-      transaction.created_at,
-    );
+    try {
+      db.prepare(`
+        INSERT INTO transactions
+          (id, from_id, to_id, amount_cents, currency, note, status, idempotency_key, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        transaction.id,
+        transaction.from_id,
+        transaction.to_id,
+        transaction.amount_cents,
+        transaction.currency,
+        transaction.note,
+        transaction.status,
+        transaction.idempotency_key,
+        transaction.created_at,
+      );
+    } catch (error) {
+      // Otra conexión pudo insertar la misma clave entre el chequeo y el INSERT.
+      if (!input.idempotencyKey || !isIdempotencyUniqueViolation(error)) throw error;
+      const existing = findTransactionByIdempotency(db, input.fromId, input.idempotencyKey);
+      if (!existing) throw error;
+      return replayOrConflict(db, existing, receiver.id, input);
+    }
 
     const senderBalance = sender.balance_cents - transaction.amount_cents;
     const receiverBalance = receiver.balance_cents + transaction.amount_cents;
 
     setBalance(db, sender.id, senderBalance);
     setBalance(db, receiver.id, receiverBalance);
-    insertLedgerEntry(db, transaction.id, sender.id, -transaction.amount_cents, senderBalance, createdAt);
-    insertLedgerEntry(db, transaction.id, receiver.id, transaction.amount_cents, receiverBalance, createdAt);
+    insertLedgerEntry(
+      db,
+      transaction.id,
+      sender.id,
+      -transaction.amount_cents,
+      senderBalance,
+      'payment_out',
+      createdAt,
+    );
+    insertLedgerEntry(
+      db,
+      transaction.id,
+      receiver.id,
+      transaction.amount_cents,
+      receiverBalance,
+      'payment_in',
+      createdAt,
+    );
 
-    return { transaction: buildTransactionView(db, transaction), idempotentReplay: false };
+    return { transaction: buildTransactionView(db, transaction, sender.id), idempotentReplay: false };
   });
 }
 
@@ -309,7 +379,7 @@ export function getTransactionForParticipant(
   const row = db
     .prepare('SELECT * FROM transactions WHERE id = ? AND (from_id = ? OR to_id = ?)')
     .get(transactionId, participantId, participantId) as TransactionRow | undefined;
-  return row ? buildTransactionView(db, row) : undefined;
+  return row ? buildTransactionView(db, row, participantId) : undefined;
 }
 
 export function getStats(db: DatabaseSync): Stats {

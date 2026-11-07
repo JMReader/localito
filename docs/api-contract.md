@@ -64,6 +64,8 @@ Respuesta `200`:
 }
 ```
 
+El token es un UUID opaco que sólo se devuelve al cliente. La API guarda su SHA-256 en `sessions.token_hash` con vencimiento (`expires_at`) a 24 horas; un token vencido responde `401 UNAUTHORIZED`. Los tokens no se registran en logs.
+
 Errores: `404 NOT_FOUND` si el alias no existe.
 
 ### `GET /me`
@@ -72,7 +74,7 @@ Auth. Devuelve el participante autenticado con los mismos campos que arriba.
 
 ### `GET /participants?q=<texto>`
 
-Auth. Busca por alias o nombre. Sin `q`, devuelve hasta 20 participantes. Incluye al propio usuario; el front puede filtrarlo.
+Auth. Busca por alias o nombre visible (`q` literal: `%`, `_` y `\` se escapan). Sin `q`, devuelve hasta 20 participantes. Incluye al propio usuario; el front puede filtrarlo.
 
 ```json
 {
@@ -84,7 +86,7 @@ Auth. Busca por alias o nombre. Sin `q`, devuelve hasta 20 participantes. Incluy
 
 ### `POST /payments`
 
-Auth. Header recomendado: `Idempotency-Key: <uuid>`. Si se repite la misma clave para el mismo emisor, devuelve la misma transacción con `idempotent_replay: true` y no vuelve a mover saldos.
+Auth. El destinatario (`to`) es el alias del participante, no su id interno. Header opcional `Idempotency-Key: <texto>` de hasta 120 caracteres. Si se repite la misma clave para el mismo emisor con el mismo body, devuelve la misma transacción con `idempotent_replay: true` y no vuelve a mover saldos. Si el body difiere, responde `409 IDEMPOTENCY_CONFLICT`. La nota (`note`) admite hasta 280 caracteres.
 
 Body:
 
@@ -116,7 +118,7 @@ Errores de negocio (`422` salvo indicación):
 
 | code | cuándo | details |
 |---|---|---|
-| `VALIDATION_ERROR` | body inválido, monto <= 0, alias faltante | `issues` |
+| `VALIDATION_ERROR` | body inválido, monto <= 0, alias faltante, nota > 280 o Idempotency-Key > 120 | `issues` |
 | `UNAUTHORIZED` (401) | token ausente o inválido | — |
 | `NOT_FOUND` (404) | destinatario inexistente | — |
 | `SELF_PAYMENT` | `to` es el mismo usuario | — |
@@ -157,7 +159,7 @@ Auth. Devuelve solo los movimientos del usuario autenticado, más recientes prim
 
 ### `GET /transactions/:id`
 
-Auth. Devuelve el detalle completo si el usuario participó; `404` si no existe o no participó.
+Auth. Devuelve el detalle completo si el usuario participó; `404` si no existe o no participó. Los saldos del detalle son relativos: `balance_after_cents` es el saldo del usuario autenticado después del movimiento y `counterparty_balance_after_cents` el de la contraparte en ese mismo movimiento.
 
 ### `GET /stats`
 
@@ -176,7 +178,15 @@ Auth. Para el indicador de circularidad y la verificación de la demo.
 
 ### `POST /demo/reset`
 
-Solo si `DEMO_MODE=true` (default en desarrollo). Body `{ "confirm": "reset" }`. Borra movimientos, sesiones y deja los participantes en saldo `0`. Respuesta `200` con `{ "reset": true }`. No se expone en producción.
+Auth. Sólo si `DEMO_MODE=true` (default en desarrollo). Body `{ "confirm": "reset" }`. Sin Bearer responde `401 UNAUTHORIZED` y no borra nada. Borra movimientos, asientos y sesiones, y deja los participantes en saldo `0`. Respuesta `200` con `{ "reset": true }`. Con `DEMO_MODE=false` responde `404 NOT_FOUND` aun con sesión válida.
+
+## Límites explícitos
+
+- `alias`: 1 a 64 caracteres. `note`: hasta 280. `Idempotency-Key`: hasta 120.
+- `q` se interpreta literal: `%`, `_` y `\` se escapan.
+- Sesiones: el token crudo sólo viaja en la respuesta de login; en la base se guarda SHA-256 con `expires_at` a 24 h.
+- Destinatario de pago: sólo alias; el id interno (`p_...`) no se acepta en `to`.
+- SQLite: `foreign_keys=ON`, `busy_timeout=5000` y WAL en archivo. Las DB previas se migran al arrancar sin perder sesiones ni asientos.
 
 ## CORS
 
@@ -184,12 +194,12 @@ En desarrollo se permite el origen del front (`http://localhost:3000`, `http://l
 
 ## Persistencia
 
-SQLite local en `services/api/data/localito.db` (ignorado por git). El esquema se crea al arrancar. En tests se usa `:memory:`.
+SQLite local en `services/api/data/localito.db` (ignorado por git). El esquema, las migraciones y el seed se aplican al arrancar. En tests se usa `:memory:`.
 
 ## Contrato de integración con el front
 
 - El front no calcula saldos ni límites: los muestra desde `GET /me` y `GET /participants`.
-- El front genera `Idempotency-Key` con `crypto.randomUUID()` por intento de pago y la reutiliza al reintentar.
+- El front genera `Idempotency-Key` con `crypto.randomUUID()` por intento de pago y la reutiliza al reintentar. La API acepta hasta 120 caracteres.
 - El front refresca `GET /me` y `GET /transactions` después de un pago confirmado.
 - Errores: mostrar `error.message`; usar `error.code` para estados especiales (`INSUFFICIENT_CREDIT`, `RECEIVER_LIMIT`).
 - No hay websockets ni push en v0: el comercio refresca o consulta al recibir un cobro.
