@@ -472,7 +472,42 @@ function HighDefAsciiCoin({
 
 /* ============================================================================
    SLIDE TO CONFIRM (PISTA TACTIL LEMON)
+   Drag real con pointer capture (touch + mouse): el transform se aplica directo
+   al DOM para no re-renderizar por frame; al soltar >=85% explota a toda la
+   pantalla con slideBurst y confirma a mitad de la expansion.
    ============================================================================ */
+const SLIDE_KNOB = 44;
+const SLIDE_PAD = 6;
+
+function slideBurst(x: number, y: number) {
+  const size = Math.max(window.innerWidth, window.innerHeight) * 2.4;
+  const el = document.createElement("div");
+  Object.assign(el.style, {
+    position: "fixed",
+    left: `${x - size / 2}px`,
+    top: `${y - size / 2}px`,
+    width: `${size}px`,
+    height: `${size}px`,
+    borderRadius: "50%",
+    background: "#00DF1A",
+    transform: "scale(0)",
+    zIndex: "2147483647",
+    pointerEvents: "none",
+  });
+  document.body.appendChild(el);
+  el.animate([{ transform: "scale(0)" }, { transform: "scale(1)" }], {
+    duration: 560,
+    easing: "cubic-bezier(.3,.8,.3,1)",
+    fill: "forwards",
+  });
+  window.setTimeout(() => {
+    el.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 300,
+      fill: "forwards",
+    }).onfinish = () => el.remove();
+  }, 560);
+}
+
 function SlideToConfirm({
   label,
   disabled,
@@ -483,64 +518,116 @@ function SlideToConfirm({
   onConfirm: () => void;
 }) {
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const [dragX, setDragX] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  const knobRef = useRef<HTMLButtonElement | null>(null);
+  const fillRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef({ active: false, x: 0, start: 0, max: 1 });
+  const [armed, setArmed] = useState(false);
   const [done, setDone] = useState(false);
 
-  const handleMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragging || done || disabled || !trackRef.current) return;
-    const rect = trackRef.current.getBoundingClientRect();
-    const maxPx = Math.max(120, rect.width - 60);
-    const next = Math.max(0, Math.min(maxPx, e.clientX - rect.left - 28));
-    setDragX(next);
-    if (next >= maxPx * 0.9) {
-      setDragging(false);
-      setDone(true);
-      setDragX(maxPx);
-      onConfirm();
-    }
+  const setX = (x: number, animate: boolean) => {
+    const knob = knobRef.current;
+    const fill = fillRef.current;
+    if (!knob || !fill) return;
+    const t = animate ? "transform .3s cubic-bezier(.3,.9,.3,1.2)" : "none";
+    knob.style.transition = t;
+    fill.style.transition = animate
+      ? "width .3s cubic-bezier(.3,.9,.3,1.2)"
+      : "none";
+    knob.style.transform = `translateX(${x}px)`;
+    fill.style.width = `${x + SLIDE_KNOB + SLIDE_PAD * 2}px`;
   };
 
-  const handleEnd = () => {
-    if (!done) {
-      setDragging(false);
-      setDragX(0);
+  const succeed = () => {
+    if (done) return;
+    setDone(true);
+    setX(dragRef.current.max, true);
+    const rect = knobRef.current?.getBoundingClientRect();
+    const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+    const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+    window.setTimeout(() => slideBurst(cx, cy), 140);
+    window.setTimeout(onConfirm, 430);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (disabled || done || !trackRef.current) return;
+    dragRef.current.active = true;
+    dragRef.current.start = e.clientX - dragRef.current.x;
+    dragRef.current.max = Math.max(
+      1,
+      trackRef.current.clientWidth - SLIDE_KNOB - SLIDE_PAD * 2
+    );
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current.active || done) return;
+    const x = Math.max(
+      0,
+      Math.min(dragRef.current.max, e.clientX - dragRef.current.start)
+    );
+    dragRef.current.x = x;
+    setX(x, false);
+    const isArmed = x >= dragRef.current.max * 0.85;
+    if (isArmed !== armed) setArmed(isArmed);
+  };
+
+  const handlePointerEnd = () => {
+    if (!dragRef.current.active) return;
+    dragRef.current.active = false;
+    if (dragRef.current.x >= dragRef.current.max * 0.85) {
+      succeed();
+    } else {
+      dragRef.current.x = 0;
+      setX(0, true);
+      setArmed(false);
     }
   };
 
   return (
     <div
       ref={trackRef}
-      onPointerMove={handleMove}
-      onPointerUp={handleEnd}
-      onPointerLeave={handleEnd}
-      className={`relative h-14 w-full rounded-full bg-[#121418] border border-white/10 overflow-hidden select-none touch-none flex items-center px-1.5 ${
-        disabled ? "opacity-40" : ""
-      }`}
+      className={`relative h-14 w-full rounded-full bg-[#121418] border overflow-hidden select-none touch-none flex items-center px-1.5 transition-colors ${
+        armed ? "border-[#00DF1A]/60" : "border-white/10"
+      } ${disabled ? "opacity-40" : ""}`}
     >
       <div
-        className="absolute inset-y-0 left-0 bg-[#00DF1A]/20"
-        style={{ width: `${dragX + 52}px` }}
+        ref={fillRef}
+        className={`absolute inset-y-0 left-0 transition-colors ${
+          armed ? "bg-[#00DF1A]/30" : "bg-[#00DF1A]/15"
+        }`}
+        style={{ width: SLIDE_KNOB + SLIDE_PAD * 2 }}
       />
-      <span className="w-full text-center text-xs font-bold tracking-wide text-white pointer-events-none z-10">
-        {done ? "Confirmado" : label}
+      <span
+        className={`absolute inset-0 flex items-center justify-center text-xs font-bold tracking-wide pointer-events-none z-10 transition-colors ${
+          armed || done ? "text-[#00DF1A]" : "text-white"
+        }`}
+      >
+        {done ? "Confirmando…" : armed ? "Soltá para confirmar" : label}
       </span>
       <button
+        ref={knobRef}
         type="button"
         disabled={disabled}
-        onPointerDown={() => !done && !disabled && setDragging(true)}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
         onKeyDown={(e) => {
           if ((e.key === "Enter" || e.key === " ") && !done && !disabled) {
             e.preventDefault();
-            setDone(true);
-            onConfirm();
+            succeed();
           }
         }}
-        style={{ transform: `translateX(${dragX}px)` }}
         aria-label={label}
-        className="relative z-20 w-11 h-11 rounded-full bg-[#00DF1A] text-[#090D0A] flex items-center justify-center shadow-md cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed"
+        className={`relative z-20 w-11 h-11 rounded-full text-[#090D0A] flex items-center justify-center shadow-md cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed transition-colors ${
+          done ? "bg-white" : "bg-[#00DF1A]"
+        }`}
       >
-        <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+        {done ? (
+          <Check className="w-5 h-5 stroke-[2.8]" />
+        ) : (
+          <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+        )}
       </button>
     </div>
   );
@@ -1513,6 +1600,7 @@ function WalletScreen({
                     )}
 
                     <SlideToConfirm
+                      key={sendError ?? "ok"}
                       label={
                         sending
                           ? "Enviando…"
