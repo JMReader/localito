@@ -12,6 +12,7 @@ import {
   Eye,
   EyeOff,
   QrCode,
+  Send,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -1331,11 +1332,11 @@ function WalletScreen({
           <div className="w-full grid grid-cols-4 gap-3 my-5">
             <button
               type="button"
-              onClick={() => openSheet("scan")}
+              onClick={() => openSheet("send")}
               className="group flex flex-col items-center gap-1.5 cursor-pointer focus-visible:outline-none"
             >
               <span className="w-14 h-14 rounded-full bg-[#00DF1A] text-[#090D0A] flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
-                <QrCode className="w-6 h-6 stroke-[2.3]" />
+                <Send className="w-6 h-6 stroke-[2.3]" />
               </span>
               <span className="text-xs font-semibold text-white">Pagar</span>
             </button>
