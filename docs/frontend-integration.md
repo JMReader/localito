@@ -96,12 +96,12 @@ refrescar `GET /me` y `GET /transactions`.
 
 ## Qué mostrar y qué ocultar en el demo
 
-El prototipo Lemon UI tiene multi-activo (`ARGt`, `TL`, `USDT`, `USDC`, `DAI`), swap, depósito y
-crédito onchain. El backend v0 solo implementa **la moneda local (`TL` / `localito`)**.
+El prototipo Lemon UI tiene multi-activo (`ARGt`, `PRt`, `USDT`, `USDC`, `DAI`), swap, depósito y
+crédito onchain. El backend v0 solo implementa **la moneda local (`PRt` / `localito`)**.
 
 Para el demo:
 
-- Mostrar `TL` como la moneda principal y mapear `balance_cents` a su saldo.
+- Mostrar `PRt` como la moneda principal y mapear `balance_cents` a su saldo.
 - Ocultar o deshabilitar `ARGt`, `USDT`, `USDC`, `DAI`, Swap y Depósito con un aviso "no disponible
   en esta demo".
 - La línea de crédito se muestra con `credit_limit_cents` y `available_cents` reales; no usar los
