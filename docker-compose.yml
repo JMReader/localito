@@ -1,0 +1,18 @@
+services:
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - HOST=0.0.0.0
+      - DEMO_MODE=true
+      - DATABASE_PATH=/app/data/localito.db
+      - CORS_ORIGINS=https://frontend-murex-eight-39.vercel.app,http://localhost:3000
+    volumes:
+      - api-data:/app/data
+
+volumes:
+  api-data:

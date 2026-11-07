@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: localito-api
+    runtime: docker
+    dockerfilePath: services/api/Dockerfile
+    dockerContext: services/api
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: HOST
+        value: 0.0.0.0
+      - key: DEMO_MODE
+        value: true
+      - key: CORS_ORIGINS
+        value: https://frontend-murex-eight-39.vercel.app,http://localhost:3000
