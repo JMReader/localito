@@ -157,6 +157,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     origin(origin, callback) {
       if (!origin) return callback(null, true);
       if (allowedOrigins.has(origin)) return callback(null, true);
+      if (allowedOrigins.has('*')) return callback(null, true);
+      if (origin.endsWith('.vercel.app')) return callback(null, true);
       if (demoMode && isLocalOrigin(origin)) return callback(null, true);
       return callback(null, false);
     },
