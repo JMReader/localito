@@ -1,0 +1,1093 @@
+{
+  "meta": {
+    "feature_id": "localito",
+    "document_type": "task_plan",
+    "version": "0.1.0",
+    "status": "in_progress",
+    "language": "es-AR",
+    "generated": "2026-11-07",
+    "updated": "2026-11-07",
+    "title": "Localito — Plan de tareas (slice demostrable)",
+    "source_technical_spec": {
+      "path": "docs/technical-spec.json",
+      "version": "0.1.0",
+      "status": "in_progress"
+    },
+    "source_api_contract": {
+      "path": "docs/api-contract.md",
+      "status": "congelado"
+    },
+    "milestone": {
+      "id": "M1",
+      "name": "first_demo",
+      "statement": "Ana paga al kiosco, ambos ven el saldo y el historial actualizados, y /stats devuelve zero_sum_ok=true.",
+      "tasks": [
+        "T22",
+        "T23",
+        "T24",
+        "T26",
+        "T27",
+        "T28",
+        "T30"
+      ],
+      "done_when": [
+        "ana inicia sesión y ve saldo 0, límite 50.000 y disponible 50.000.",
+        "ana paga 1.500 al kiosco y ve el recibo con saldo resultante -1.500.",
+        "kiosco ve saldo 1.500 y el cobro en su historial.",
+        "GET /stats devuelve sum_balances_cents = 0 y zero_sum_ok = true.",
+        "Un reintento del mismo pago no duplica el movimiento."
+      ]
+    },
+    "parallelization_notes": [
+      "Fase 1 (backend) y fase 2 (front de Oky) avanzan en paralelo contra docs/api-contract.md congelado; no hay generación de tipos ni mock server obligatorio.",
+      "El front puede empezar con POST /auth/demo y GET /me ni bien T08 esté disponible; el resto del contrato ya está definido.",
+      "No se edita apps/web desde backend ni services/api desde el front: cada dueño mantiene su carpeta.",
+      "La integración (fase 3) sólo arranca cuando backend y front tienen sus tareas base en verde.",
+      "QA (fase 4) depende de la integración; la fase 5 queda bloqueada por decisiones abiertas.",
+      "Los documentos (fase 0) están cerrados: cualquier cambio de contrato exige aviso previo a Oky y actualización de docs/api-contract.md."
+    ],
+    "owners": {
+      "backend": "equipo backend (services/api)",
+      "frontend": "equipo frontend (apps/web), coordinado con Oky",
+      "oky": "Octavio (Voyager-Ov), dueño de apps/web",
+      "qa": "verificación y guion de demo"
+    },
+    "status_legend": {
+      "done": "Entregado y verificable en el repo.",
+      "in_progress": "Trabajo activo en este momento.",
+      "pending": "Planificado, sin empezar.",
+      "blocked": "No puede empezar hasta resolver una decisión abierta."
+    }
+  },
+  "phases": [
+    {
+      "id": "P0",
+      "name": "Contrato y fundación",
+      "goal": "Dejar fijados el alcance, el contrato HTTP y el esqueleto del backend antes de escribir lógica de negocio.",
+      "exit_criteria": "docs/api-contract.md congelado, esquema SQLite creado al arrancar y seed idempotente disponible.",
+      "tasks": [
+        "T01",
+        "T02",
+        "T03",
+        "T04",
+        "T05",
+        "T06"
+      ]
+    },
+    {
+      "id": "P1",
+      "name": "Backend: ledger y autenticación",
+      "goal": "Implementar el circuito mínimo en services/api: sesión de demo, consulta de saldo, pago con invariantes, historial y stats.",
+      "exit_criteria": "Todos los endpoints del contrato responden con la forma acordada y los tests de invariantes pasan.",
+      "tasks": [
+        "T07",
+        "T08",
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "T15",
+        "T16",
+        "T17"
+      ]
+    },
+    {
+      "id": "P2",
+      "name": "Frontend: PWA de Oky",
+      "goal": "Construir la PWA que consume el contrato: login, saldo, pago, historial y vista de comercio.",
+      "exit_criteria": "Un usuario completa login, pago y consulta de historial en la PWA local.",
+      "tasks": [
+        "T18",
+        "T19",
+        "T20",
+        "T21",
+        "T22",
+        "T23",
+        "T24",
+        "T25"
+      ]
+    },
+    {
+      "id": "P3",
+      "name": "Integración",
+      "goal": "Conectar front y API en local y verificar el flujo completo con datos reales del seed.",
+      "exit_criteria": "El flujo ana paga kiosco funciona de punta a punta sin mocks.",
+      "tasks": [
+        "T26",
+        "T27",
+        "T28"
+      ]
+    },
+    {
+      "id": "P4",
+      "name": "QA y demo",
+      "goal": "Verificar criterios de aceptación del slice, suma cero y seguridad mínima; dejar el guion de demo listo.",
+      "exit_criteria": "Criterios del slice en verde, guion ensayado y datos reproducibles con /demo/reset.",
+      "tasks": [
+        "T29",
+        "T30",
+        "T31",
+        "T32"
+      ]
+    },
+    {
+      "id": "P5",
+      "name": "Alcance completo diferido",
+      "goal": "Planificar lo que queda fuera del demo, bloqueado hasta resolver las decisiones abiertas con Oky.",
+      "exit_criteria": "Cada tarea tiene decisión previa resuelta y aprobación de spec técnica y todos.",
+      "tasks": [
+        "T33",
+        "T34",
+        "T35",
+        "T36",
+        "T37",
+        "T38",
+        "T39",
+        "T40",
+        "T41",
+        "T42",
+        "T43",
+        "T44"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T01",
+      "phase": "P0",
+      "title": "Especificación funcional aprobada",
+      "description": "Spec funcional con 18 ítems de alcance, reglas de negocio, casos de uso y 27 criterios de aceptación, aprobada en conversación.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [],
+      "parallel_group": "g0-docs",
+      "acceptance": "docs/functional-spec.json existe, parsea como JSON y está marcada como aprobada.",
+      "files_areas": [
+        "docs/functional-spec.json"
+      ],
+      "blockers": [],
+      "estimate": "L"
+    },
+    {
+      "id": "T02",
+      "phase": "P0",
+      "title": "Contrato API v0 congelado",
+      "description": "Contrato REST del flujo mínimo con participantes de demo, modelo de saldo, endpoints, errores y reglas de integración con el front.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T01"
+      ],
+      "parallel_group": "g0-docs",
+      "acceptance": "docs/api-contract.md describe los 9 endpoints y coincide con el seed y los campos del technical spec.",
+      "files_areas": [
+        "docs/api-contract.md"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T03",
+      "phase": "P0",
+      "title": "Especificación técnica y plan de tareas",
+      "description": "Documento técnico del slice demostrable y este plan de tareas, derivados de la spec funcional aprobada.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T01",
+        "T02"
+      ],
+      "parallel_group": "g0-docs",
+      "acceptance": "docs/technical-spec.json y docs/todos.json existen, parsean como JSON y cubren arquitectura, modelo de datos, API, decisiones, riesgos y trazabilidad.",
+      "files_areas": [
+        "docs/technical-spec.json",
+        "docs/todos.json"
+      ],
+      "blockers": [],
+      "estimate": "L"
+    },
+    {
+      "id": "T04",
+      "phase": "P0",
+      "title": "Scaffold del servicio API",
+      "description": "Proyecto Node 24 + TypeScript ESM + Fastify 5 + vitest en services/api, con script de arranque, tsconfig, configuración por entorno y GET /health.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T03"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "npm run dev levanta en :3001, GET /api/health devuelve el JSON del contrato y npm test ejecuta vitest sin tests fallidos.",
+      "files_areas": [
+        "services/api/package.json",
+        "services/api/tsconfig.json",
+        "services/api/src/server.ts",
+        "services/api/src/routes/health.ts"
+      ],
+      "blockers": [],
+      "estimate": "M",
+      "progress_note": "Al 2026-11-07 existe estructura inicial sin commit (package.json, tsconfig.json, src/db.ts, src/errors.ts, src/ledger.ts); falta verificar arranque y GET /health."
+    },
+    {
+      "id": "T05",
+      "phase": "P0",
+      "title": "Esquema SQLite y migración inicial",
+      "description": "Crear participants, transactions, ledger_entries y sessions con índices y pragmas; inicialización idempotente al arrancar y :memory: en tests.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T04"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "El esquema se crea sin errores en archivo y en :memory:; reiniciar no duplica tablas ni datos; las FK están activas.",
+      "files_areas": [
+        "services/api/src/repo/schema.ts",
+        "services/api/src/repo/db.ts",
+        "services/api/data/.gitignore"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T06",
+      "phase": "P0",
+      "title": "Seed de participantes de demo",
+      "description": "Cargar ana, bruno, kiosco, cafe y foto con rol, límites y saldo 0 exactamente como el contrato; inserción idempotente.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T05"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "Tras arrancar, GET /api/participants devuelve los 5 participantes con los valores del contrato; reiniciar no duplica.",
+      "files_areas": [
+        "services/api/src/repo/seed.ts"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T07",
+      "phase": "P1",
+      "title": "LedgerPort y SqliteLedger",
+      "description": "Interfaz de libro mayor (get_participant, apply_payment, list_entries, circuit_totals) y su implementación SQLite atómica, sin lógica HTTP.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T05"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "apply_payment mueve exactamente dos saldos y escribe dos asientos o no hace nada; los tests de unidad cubren límite, tope, autopago y monto inválido.",
+      "files_areas": [
+        "services/api/src/domain/ledger.ts",
+        "services/api/src/repo/sqlite-ledger.ts"
+      ],
+      "blockers": [],
+      "estimate": "L",
+      "progress_note": "Diseñado en la spec técnica y con archivo src/ledger.ts sin commit al 2026-11-07; falta la implementación SQLite, la atomicidad y los tests de invariantes."
+    },
+    {
+      "id": "T08",
+      "phase": "P1",
+      "title": "Autenticación de demo y sesiones",
+      "description": "POST /auth/demo por alias, creación de token UUID, guardado de su sha256 con TTL y GET /me con los campos del contrato.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T05"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "ana obtiene token y participante; /me con token devuelve lo mismo; alias inexistente da 404 NOT_FOUND; token inválido da 401.",
+      "files_areas": [
+        "services/api/src/routes/auth.ts",
+        "services/api/src/repo/sessions.ts"
+      ],
+      "blockers": [
+        "O7",
+        "O9"
+      ],
+      "estimate": "M"
+    },
+    {
+      "id": "T09",
+      "phase": "P1",
+      "title": "Plugin de auth y manejador de errores",
+      "description": "Decorador de autenticación Bearer reutilizable y error handler único que produce { error: { code, message, details } } sin stack traces.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T04"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "Rutas protegidas sin token dan 401; cualquier error de dominio devuelve la forma única con el código del contrato.",
+      "files_areas": [
+        "services/api/src/plugins/auth.ts",
+        "services/api/src/plugins/error-handler.ts",
+        "services/api/src/domain/errors.ts"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T10",
+      "phase": "P1",
+      "title": "GET /participants con búsqueda",
+      "description": "Listado y búsqueda por alias o nombre visible, máximo 20, incluyendo al propio usuario.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T06",
+        "T09"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "Sin q devuelve hasta 20; con q='kios' devuelve kiosco; con q sin resultados devuelve lista vacía; nunca expone datos fuera del contrato.",
+      "files_areas": [
+        "services/api/src/routes/participants.ts",
+        "services/api/src/repo/participants.ts"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T11",
+      "phase": "P1",
+      "title": "POST /payments con validaciones de negocio",
+      "description": "Pago autenticado con monto entero positivo, destinatario por alias, nota opcional, chequeo de estado, límite del emisor y tope del receptor.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T07",
+        "T09",
+        "T10"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "Caso feliz devuelve 201 con transaction y saldos; exceso de límite da INSUFFICIENT_CREDIT con shortfall; tope del receptor da RECEIVER_LIMIT; autopago SELF_PAYMENT; monto <= 0 VALIDATION_ERROR.",
+      "files_areas": [
+        "services/api/src/routes/payments.ts",
+        "services/api/src/domain/payments.ts",
+        "services/api/src/domain/schemas.ts"
+      ],
+      "blockers": [],
+      "estimate": "L"
+    },
+    {
+      "id": "T12",
+      "phase": "P1",
+      "title": "Idempotencia de pagos",
+      "description": "Soporte de Idempotency-Key por emisor: replay con la misma transacción, conflicto si el body difiere y sin efectos en saldos.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T11"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "Dos POST con la misma clave devuelven una sola transacción y una sola pareja de asientos; la segunda respuesta trae idempotent_replay=true; body distinto da 409 IDEMPOTENCY_CONFLICT.",
+      "files_areas": [
+        "services/api/src/domain/idempotency.ts",
+        "services/api/src/routes/payments.ts"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T13",
+      "phase": "P1",
+      "title": "Historial y recibo",
+      "description": "GET /transactions propios con direction y counterparty; GET /transactions/:id con 404 si el usuario no participó.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T07",
+        "T09"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "ana ve dirección out y kiosco in del mismo pago; limit respeta el máximo 100; un tercero recibe 404 en el detalle.",
+      "files_areas": [
+        "services/api/src/routes/transactions.ts",
+        "services/api/src/repo/transactions.ts"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T14",
+      "phase": "P1",
+      "title": "GET /stats de circularidad",
+      "description": "Totales del circuito con participant_count, transaction_count, total_volume_cents, sum_balances_cents, zero_sum_ok y currency.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T11"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "Con seed y un pago, zero_sum_ok es true y sum_balances_cents es 0; los contadores coinciden con la base.",
+      "files_areas": [
+        "services/api/src/routes/stats.ts",
+        "services/api/src/repo/sqlite-ledger.ts"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T15",
+      "phase": "P1",
+      "title": "POST /demo/reset protegido",
+      "description": "Reset de demo con body {confirm:'reset'}, borrado de movimientos y sesiones y saldos en 0; sólo si DEMO_MODE=true.",
+      "owner": "backend",
+      "status": "done",
+      "depends_on": [
+        "T06",
+        "T09"
+      ],
+      "parallel_group": "g1-backend",
+      "acceptance": "Con DEMO_MODE=true devuelve {reset:true} y deja el seed intacto; con DEMO_MODE=false la ruta no existe o responde 404; confirm distinto no borra nada.",
+      "files_areas": [
+        "services/api/src/routes/demo.ts"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T16",
+      "phase": "P1",
+      "title": "Tests de contrato de las respuestas",
+      "description": "Tests que fallan si la forma de las respuestas o del objeto error se aparta de docs/api-contract.md.",
+      "owner": "qa",
+      "status": "done",
+      "depends_on": [
+        "T11",
+        "T13",
+        "T14"
+      ],
+      "parallel_group": "g1-contract",
+      "acceptance": "Cada endpoint del contrato tiene al menos un test de forma; los códigos de error se validan uno por uno.",
+      "files_areas": [
+        "services/api/test/contract/"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T17",
+      "phase": "P1",
+      "title": "Tests de invariantes del ledger",
+      "description": "Suma cero, coincidencia saldo/asiento, límite exacto, rechazos sin efectos y atomicidad ante fallos.",
+      "owner": "qa",
+      "status": "done",
+      "depends_on": [
+        "T07",
+        "T11"
+      ],
+      "parallel_group": "g1-contract",
+      "acceptance": "La batería de invariantes del technical spec pasa en verde y cubre al menos 10 escenarios.",
+      "files_areas": [
+        "services/api/test/unit/",
+        "services/api/test/integration/payments.test.ts"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T18",
+      "phase": "P2",
+      "title": "Setup de la PWA",
+      "description": "Base de la app web instalable, configuración de entorno para la API y navegación principal.",
+      "owner": "oky",
+      "status": "in_progress",
+      "depends_on": [],
+      "parallel_group": "g2-front",
+      "acceptance": "La PWA arranca en local, apunta a http://localhost:3001/api y muestra una pantalla inicial usable en celular.",
+      "files_areas": [
+        "apps/web/"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T19",
+      "phase": "P2",
+      "title": "Login de demo y sesión",
+      "description": "Pantalla de ingreso por alias, guardado del token y restauración de sesión al recargar.",
+      "owner": "oky",
+      "status": "pending",
+      "depends_on": [
+        "T18"
+      ],
+      "parallel_group": "g2-front",
+      "acceptance": "ana entra, ve su nombre y saldo, y la sesión sobrevive a un refresh; token inválido vuelve al login.",
+      "files_areas": [
+        "apps/web/"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T20",
+      "phase": "P2",
+      "title": "Inicio con saldo, límite y disponible",
+      "description": "Vista de inicio que muestra saldo, crédito disponible y capacidad de recepción desde GET /me, sin recalcular en el front.",
+      "owner": "oky",
+      "status": "pending",
+      "depends_on": [
+        "T19"
+      ],
+      "parallel_group": "g2-front",
+      "acceptance": "Los tres números coinciden con la respuesta de /me y se actualizan al volver de un pago.",
+      "files_areas": [
+        "apps/web/"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T21",
+      "phase": "P2",
+      "title": "Directorio y búsqueda",
+      "description": "Listado y búsqueda de participantes con estado, y acceso directo a pagar.",
+      "owner": "oky",
+      "status": "pending",
+      "depends_on": [
+        "T19"
+      ],
+      "parallel_group": "g2-front",
+      "acceptance": "Buscar 'kios' muestra Kiosco La Esquina; sin resultados aparece un mensaje claro; se puede iniciar el pago desde el resultado.",
+      "files_areas": [
+        "apps/web/"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T22",
+      "phase": "P2",
+      "title": "Flujo de pago con idempotencia",
+      "description": "Monto, nota, resumen y confirmación; genera Idempotency-Key con crypto.randomUUID() y la reutiliza al reintentar.",
+      "owner": "oky",
+      "status": "pending",
+      "depends_on": [
+        "T19",
+        "T21"
+      ],
+      "parallel_group": "g2-front",
+      "acceptance": "Un pago confirmado muestra recibo y saldos actualizados; un reintento no duplica; errores de límite y tope se muestran con mensaje accionable.",
+      "files_areas": [
+        "apps/web/"
+      ],
+      "blockers": [],
+      "estimate": "L"
+    },
+    {
+      "id": "T23",
+      "phase": "P2",
+      "title": "Historial y recibo",
+      "description": "Lista de movimientos con dirección, contraparte, monto y fecha, y detalle de cada movimiento.",
+      "owner": "oky",
+      "status": "pending",
+      "depends_on": [
+        "T19"
+      ],
+      "parallel_group": "g2-front",
+      "acceptance": "ana ve su pago como salida y kiosco como entrada; el detalle muestra nota, fecha y saldo resultante.",
+      "files_areas": [
+        "apps/web/"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T24",
+      "phase": "P2",
+      "title": "Vista de comercio",
+      "description": "Pantalla de comercio con saldo, cobros recibidos y capacidad de recepción.",
+      "owner": "oky",
+      "status": "pending",
+      "depends_on": [
+        "T22",
+        "T23"
+      ],
+      "parallel_group": "g2-front",
+      "acceptance": "kiosco ve el cobro de ana al refrescar, con saldo y capacidad actualizados.",
+      "files_areas": [
+        "apps/web/"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T25",
+      "phase": "P2",
+      "title": "Errores accionables y accesibilidad básica",
+      "description": "Mostrar error.message, usar error.code para estados especiales, foco visible, contraste y etiquetas en el flujo de pago.",
+      "owner": "oky",
+      "status": "pending",
+      "depends_on": [
+        "T22"
+      ],
+      "parallel_group": "g2-front",
+      "acceptance": "INSUFFICIENT_CREDIT y RECEIVER_LIMIT se explican sin códigos internos; el flujo es navegable con teclado y legible en pantalla chica.",
+      "files_areas": [
+        "apps/web/"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T26",
+      "phase": "P3",
+      "title": "Integración front y API en local",
+      "description": "Levantar API y PWA juntas, resolver CORS, sesión y refresco de datos después de un pago.",
+      "owner": "backend",
+      "status": "pending",
+      "depends_on": [
+        "T11",
+        "T13",
+        "T19",
+        "T22",
+        "T23"
+      ],
+      "parallel_group": "g3-integration",
+      "acceptance": "Desde la PWA se hace login, pago y consulta de historial contra la API real, sin mocks ni errores de CORS.",
+      "files_areas": [
+        "services/api/",
+        "apps/web/"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T27",
+      "phase": "P3",
+      "title": "Integración de vista de comercio y stats",
+      "description": "Verificar que el comercio ve el cobro y que el indicador de circularidad refleja la suma cero.",
+      "owner": "backend",
+      "status": "pending",
+      "depends_on": [
+        "T14",
+        "T24",
+        "T26"
+      ],
+      "parallel_group": "g3-integration",
+      "acceptance": "Tras el pago, la vista de comercio muestra el cobro y /stats muestra zero_sum_ok=true en la app.",
+      "files_areas": [
+        "services/api/",
+        "apps/web/"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T28",
+      "phase": "P3",
+      "title": "Guion de demo end-to-end",
+      "description": "Secuencia reproducible ana paga al kiosco con reset previo, verificación de ambos saldos, historial y stats.",
+      "owner": "qa",
+      "status": "pending",
+      "depends_on": [
+        "T27"
+      ],
+      "parallel_group": "g3-integration",
+      "acceptance": "El guion se ejecuta de punta a punta sin pasos manuales ocultos y deja evidencia de los saldos antes y después.",
+      "files_areas": [
+        "docs/"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T29",
+      "phase": "P4",
+      "title": "Verificación de criterios del slice",
+      "description": "Comprobar AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-20 y AC-23 sobre la API y la PWA integradas.",
+      "owner": "qa",
+      "status": "pending",
+      "depends_on": [
+        "T28"
+      ],
+      "parallel_group": "g4-qa",
+      "acceptance": "Cada criterio tiene un caso ejecutado y su resultado registrado; ninguno queda en duda.",
+      "files_areas": [
+        "services/api/test/",
+        "docs/"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T30",
+      "phase": "P4",
+      "title": "Verificación de suma cero y reset",
+      "description": "Chequear que /stats da cero después de una secuencia de pagos y que /demo/reset reconstruye el estado inicial.",
+      "owner": "qa",
+      "status": "pending",
+      "depends_on": [
+        "T14",
+        "T15",
+        "T28"
+      ],
+      "parallel_group": "g4-qa",
+      "acceptance": "Tras N pagos, sum_balances_cents = 0; tras reset, todos los saldos en 0 y sin sesiones activas.",
+      "files_areas": [
+        "services/api/test/"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T31",
+      "phase": "P4",
+      "title": "Hardening mínimo de seguridad del demo",
+      "description": "Revisar que no se logueen tokens, que DEMO_MODE=false desactive reset y CORS amplio, y que el archivo SQLite esté ignorado por git.",
+      "owner": "backend",
+      "status": "pending",
+      "depends_on": [
+        "T08",
+        "T15"
+      ],
+      "parallel_group": "g4-qa",
+      "acceptance": "Con DEMO_MODE=false no hay reset ni CORS abierto; no hay tokens ni secretos en logs ni en el repo.",
+      "files_areas": [
+        "services/api/src/plugins/",
+        "services/api/.env.example",
+        ".gitignore"
+      ],
+      "blockers": [
+        "O7",
+        "O9"
+      ],
+      "estimate": "S"
+    },
+    {
+      "id": "T32",
+      "phase": "P4",
+      "title": "Ensayo general y checklist de demo",
+      "description": "Ensayo completo con el guion, verificación de datos limpios y lista de pasos para el día de la demo.",
+      "owner": "qa",
+      "status": "pending",
+      "depends_on": [
+        "T29",
+        "T30",
+        "T31"
+      ],
+      "parallel_group": "g4-qa",
+      "acceptance": "El ensayo termina con el milestone first_demo cumplido y un checklist aprobado.",
+      "files_areas": [
+        "docs/"
+      ],
+      "blockers": [],
+      "estimate": "S"
+    },
+    {
+      "id": "T33",
+      "phase": "P5",
+      "title": "Definir unidad de cuenta y formateo",
+      "description": "Resolver O1 y ajustar presentación, precisión y calibración de plazos y scoring.",
+      "owner": "backend",
+      "status": "blocked",
+      "depends_on": [
+        "T32"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "O1 decidido con Oky y documentado; montos y plazos coherentes en toda la app.",
+      "files_areas": [
+        "docs/",
+        "apps/web/",
+        "services/api/"
+      ],
+      "blockers": [
+        "O1"
+      ],
+      "estimate": "M"
+    },
+    {
+      "id": "T34",
+      "phase": "P5",
+      "title": "Mora, plazo de saldado y recordatorios",
+      "description": "Reloj de deuda, detección diaria, bloqueo del deudor y avisos antes del vencimiento.",
+      "owner": "backend",
+      "status": "blocked",
+      "depends_on": [
+        "T33"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "AC-09, AC-10 y AC-11 verificados con parámetros aprobados.",
+      "files_areas": [
+        "services/api/",
+        "apps/web/"
+      ],
+      "blockers": [
+        "O2",
+        "O6"
+      ],
+      "estimate": "L"
+    },
+    {
+      "id": "T35",
+      "phase": "P5",
+      "title": "Castigo de deuda incobrable",
+      "description": "Cuenta de deuda castigada, transición a incobrable y preservación de la suma cero.",
+      "owner": "backend",
+      "status": "blocked",
+      "depends_on": [
+        "T34"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "AC-12 verificado y suma de saldos más deuda castigada igual a cero.",
+      "files_areas": [
+        "services/api/"
+      ],
+      "blockers": [
+        "O4"
+      ],
+      "estimate": "M"
+    },
+    {
+      "id": "T36",
+      "phase": "P5",
+      "title": "Fondo de Garantía y contabilidad separada",
+      "description": "Aportes, plazos, posiciones del inversor, ingresos y reserva mínima de liquidez en USDC.",
+      "owner": "backend",
+      "status": "blocked",
+      "depends_on": [
+        "T35"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "AC-14, AC-15 y AC-16 verificados con contabilidad separada del circuito.",
+      "files_areas": [
+        "services/api/",
+        "apps/web/"
+      ],
+      "blockers": [
+        "O3",
+        "O4",
+        "O8",
+        "G04"
+      ],
+      "estimate": "L"
+    },
+    {
+      "id": "T37",
+      "phase": "P5",
+      "title": "Compensación al acreedor",
+      "description": "Mecanismo de compensación con tope por período y factor de recupero, y su efecto en el valor de la participación.",
+      "owner": "backend",
+      "status": "blocked",
+      "depends_on": [
+        "T36"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "AC-13 verificado; la participación baja sólo por compensación y sube sólo por ingresos.",
+      "files_areas": [
+        "services/api/"
+      ],
+      "blockers": [
+        "O4",
+        "G04"
+      ],
+      "estimate": "L"
+    },
+    {
+      "id": "T38",
+      "phase": "P5",
+      "title": "Scoring, límites y tope global",
+      "description": "Cálculo de límite con facturación y stock, niveles T0/T1/T2, tope global y auditoría de cambios.",
+      "owner": "backend",
+      "status": "blocked",
+      "depends_on": [
+        "T33"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "AC-02 y AC-18 verificados con motivo y valores anterior y nuevo registrados.",
+      "files_areas": [
+        "services/api/",
+        "apps/web/"
+      ],
+      "blockers": [
+        "G05"
+      ],
+      "estimate": "L"
+    },
+    {
+      "id": "T39",
+      "phase": "P5",
+      "title": "Consola de broker y operador",
+      "description": "Altas, activación, suspensión, parámetros, auditoría, separación de roles y pausa de emergencia.",
+      "owner": "backend",
+      "status": "blocked",
+      "depends_on": [
+        "T38"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "AC-01, AC-21, AC-25 y AC-26 verificados con roles separados.",
+      "files_areas": [
+        "apps/web/",
+        "services/api/"
+      ],
+      "blockers": [
+        "G02"
+      ],
+      "estimate": "L"
+    },
+    {
+      "id": "T40",
+      "phase": "P5",
+      "title": "Cuotas de membresía y penalidades",
+      "description": "Emisión mensual escalonada, cobro por el medio que defina O3, penalidad por mora y registro como ingreso del Fondo.",
+      "owner": "backend",
+      "status": "blocked",
+      "depends_on": [
+        "T39"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "UC-16 completo con A08 emitiendo y operador registrando el ingreso; AC-14 sigue vigente.",
+      "files_areas": [
+        "services/api/"
+      ],
+      "blockers": [
+        "O3",
+        "G03"
+      ],
+      "estimate": "M"
+    },
+    {
+      "id": "T41",
+      "phase": "P5",
+      "title": "Notificaciones por email y push",
+      "description": "Avisos de vencimiento, mora, cuota emitida, cobro recibido y estado de retiro, sin mensajería conversacional.",
+      "owner": "backend",
+      "status": "pending",
+      "depends_on": [
+        "T34"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "AC-11 verificado por email o push y preferencias respetadas.",
+      "files_areas": [
+        "services/api/"
+      ],
+      "blockers": [],
+      "estimate": "M"
+    },
+    {
+      "id": "T42",
+      "phase": "P5",
+      "title": "Adaptador onchain del ledger",
+      "description": "Implementación de LedgerPort sobre Avalanche y el fondo en USDC, sin cambiar rutas ni contrato HTTP.",
+      "owner": "backend",
+      "status": "blocked",
+      "depends_on": [
+        "T37"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "La suite de contrato pasa sin cambios contra el adaptador; ninguna clave privada en el repo.",
+      "files_areas": [
+        "services/api/"
+      ],
+      "blockers": [
+        "O4",
+        "G04",
+        "O8"
+      ],
+      "estimate": "L"
+    },
+    {
+      "id": "T43",
+      "phase": "P5",
+      "title": "Simulación y métricas del piloto",
+      "description": "Escenarios reproducibles con parámetros y fecha, etiquetados como simulados, sobre las métricas del piloto.",
+      "owner": "qa",
+      "status": "blocked",
+      "depends_on": [
+        "T36",
+        "T38"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "AC-27 verificado con resultados reproducibles y exportables.",
+      "files_areas": [
+        "services/api/",
+        "docs/"
+      ],
+      "blockers": [
+        "O1",
+        "O2",
+        "O4"
+      ],
+      "estimate": "L"
+    },
+    {
+      "id": "T44",
+      "phase": "P5",
+      "title": "Egreso y reincorporación de miembros",
+      "description": "Definir y aplicar las reglas de reincorporación tras mora y egreso con saldo distinto de cero.",
+      "owner": "backend",
+      "status": "blocked",
+      "depends_on": [
+        "T39"
+      ],
+      "parallel_group": "g5-deferred",
+      "acceptance": "Reglas documentadas y auditadas; ningún egreso deja saldo distinto de cero sin tratamiento explícito.",
+      "files_areas": [
+        "services/api/",
+        "docs/"
+      ],
+      "blockers": [
+        "G02"
+      ],
+      "estimate": "M"
+    }
+  ],
+  "summary": {
+    "total_tasks": 44,
+    "done": 17,
+    "in_progress": 1,
+    "pending": 15,
+    "blocked": 11,
+    "critical_path": [
+      "T18",
+      "T19",
+      "T21",
+      "T22",
+      "T23",
+      "T24",
+      "T26",
+      "T27",
+      "T28",
+      "T32"
+    ],
+    "demo_scope_tasks": [
+      "T01",
+      "T02",
+      "T03",
+      "T04",
+      "T05",
+      "T06",
+      "T07",
+      "T08",
+      "T09",
+      "T10",
+      "T11",
+      "T12",
+      "T13",
+      "T14",
+      "T15",
+      "T16",
+      "T17",
+      "T18",
+      "T19",
+      "T20",
+      "T21",
+      "T22",
+      "T23",
+      "T24",
+      "T25",
+      "T26",
+      "T27",
+      "T28",
+      "T29",
+      "T30",
+      "T31",
+      "T32"
+    ],
+    "note": "Backend T04-T17 implementado y verificado (20 tests, typecheck y build). El camino crítico pasa por la PWA de Oky y la integración."
+  }
+}

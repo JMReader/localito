@@ -1,0 +1,1331 @@
+{
+  "meta": {
+    "feature_id": "localito",
+    "document_type": "technical_specification",
+    "status": "pending_approval",
+    "version": "0.1.0",
+    "language": "es-AR",
+    "created": "2026-11-07",
+    "updated": "2026-11-07",
+    "title": "Localito — Especificación técnica (slice demostrable)",
+    "source_functional_spec": {
+      "path": "docs/functional-spec.json",
+      "version": "0.1.0",
+      "status": "approved",
+      "sha256": "88020ABAC44B7CB24DF283F0320B9811C1F0DC2AE4036158D6B95E4D1FCD74A4",
+      "hash_algorithm": "sha256",
+      "note": "Hash calculado sobre la copia del repo al 2026-11-07. Si el archivo cambia, este hash deja de ser válido."
+    },
+    "hitl_disclaimer": "Este documento es borrador técnico. No se aprueba solo: requiere aprobación explícita del usuario antes de habilitar el alcance completo.",
+    "approval": {
+      "functional_spec_approved": true,
+      "approved_at": "2026-11-07",
+      "approved_by": "usuario (mdf-angel)",
+      "channel": "conversación con el agente (OpenCode)",
+      "evidence": "Aprobación verbal en conversación; no hay issue ni firma.",
+      "demo_slice_authorized": true,
+      "demo_slice_authorized_at": "2026-11-07",
+      "demo_slice_scope": "registro/demo login, saldo, pago entre participantes, historial y vista de comercio",
+      "technical_spec_approved": false,
+      "todos_approved": false,
+      "note": "La spec funcional está aprobada y el arranque del slice demostrable fue autorizado explícitamente en conversación. La spec técnica y el plan de tareas todavía no tienen aprobación explícita."
+    },
+    "conventions": {
+      "keys": "snake_case",
+      "money": "enteros en centavos; nunca floats para montos",
+      "ids": "strings con prefijo legible (p_ana, tx_...)",
+      "timestamps": "ISO 8601 UTC, string",
+      "status_labels": {
+        "DECIDIDO": "Ya resuelto en la spec funcional o por el stack elegido.",
+        "PROVISIONAL": "Valor de demo que NO resuelve el punto abierto; bloquea el alcance completo.",
+        "DIFERIDO": "Fuera del slice demostrable; se planifica en la fase 5."
+      }
+    }
+  },
+  "scope": {
+    "demo_slice": {
+      "goal": "Demostrar el circuito mínimo: una persona entra, ve su saldo, paga a un comercio, ambos ven el movimiento y el sistema muestra que la suma de saldos sigue en cero.",
+      "includes": [
+        "Participantes de demo precargados por seed (ana, bruno, kiosco, cafe, foto), sin alta asistida por broker.",
+        "Login de demo por alias (POST /auth/demo) con token de sesión.",
+        "Consulta de saldo, límite de crédito, disponible y capacidad de recepción (GET /me).",
+        "Búsqueda y listado de participantes (GET /participants).",
+        "Pago entre participantes con monto, nota, validaciones de negocio e idempotencia (POST /payments).",
+        "Historial propio y detalle/recibo (GET /transactions, GET /transactions/:id).",
+        "Vista de comercio: el mismo historial y saldo, mostrando cobros entrantes.",
+        "Indicador de circuito: GET /stats con sum_balances_cents y zero_sum_ok.",
+        "Reset de datos de demo protegido por DEMO_MODE (POST /demo/reset).",
+        "Front PWA de Oky consumiendo el contrato congelado; no se prescribe su implementación interna."
+      ],
+      "excludes": [
+        "Alta de miembros por broker y consola administrativa (S03, S14).",
+        "Scoring y cálculo de límites con facturación y stock (S06).",
+        "Mora automática, recordatorios y plazo de saldado (S10).",
+        "Castigo, compensación y Fondo de Garantía (S11, S12).",
+        "Cuota de membresía y penalidades (S13, UC-16).",
+        "Pausa de emergencia del circuito (S15).",
+        "Notificaciones por email o push (S17).",
+        "Generación de QR: el front puede resolverlo con el alias; la API no expone endpoints de QR.",
+        "Reversión, anulación o disputa de pagos (G01).",
+        "Stablecoin, off-ramp, WhatsApp, contratos onchain y adaptador real de Avalanche."
+      ]
+    },
+    "full_mvp_deferred": [
+      "S03 alta asistida por broker con verificación de datos.",
+      "S04 ciclo de vida completo del miembro (pending, suspended, delinquent, defaulted, exited) y sus transiciones.",
+      "S05 línea de crédito calculada, tope global y auditoría de cambios de límite.",
+      "S06 scoring, niveles T0/T1/T2 y crecimiento por historial.",
+      "S08 cobro con QR estático y QR con monto.",
+      "S09 directorio con rubros y oferta de la red (en el demo solo hay búsqueda por alias/nombre).",
+      "S10 mora, recordatorios, bloqueo del deudor y reloj de deuda.",
+      "S11 castigo de deuda incobrable y cuenta de deuda castigada.",
+      "S12 Fondo de Garantía con aportes, plazos, retiros en cola, compensación y contabilidad en USDC.",
+      "S13 cuota de membresía escalonada y penalidad por mora.",
+      "S14 consola de broker y operador con parámetros y auditoría.",
+      "S15 pausa de emergencia y su visibilidad en la app.",
+      "S17 notificaciones por email y push.",
+      "S18 datos de prueba, simulación de escenarios y métricas del piloto.",
+      "Adaptador onchain del ledger (Avalanche, USDC) detrás de la interfaz definida en este documento."
+    ]
+  },
+  "architecture": {
+    "style": "monolito modular con API REST y un front PWA separado; persistencia SQLite local; sin servicios externos en el demo.",
+    "components": [
+      {
+        "id": "C01",
+        "name": "apps/web (PWA)",
+        "owner": "oky",
+        "responsibility": "Interfaz de miembro y comercio. Consume el contrato REST y muestra saldos, pagos e historial.",
+        "boundaries": "No calcula saldos, límites ni disponible: los muestra tal como llegan de /me y /participants. No contiene reglas de negocio del circuito."
+      },
+      {
+        "id": "C02",
+        "name": "services/api",
+        "owner": "backend",
+        "responsibility": "Dueña de las reglas de negocio, las validaciones, la idempotencia y los invariantes contables. Expone REST JSON sobre /api.",
+        "boundaries": "Única vía de escritura del libro mayor. Ningún otro componente escribe en SQLite."
+      },
+      {
+        "id": "C03",
+        "name": "Persistencia SQLite",
+        "owner": "backend",
+        "responsibility": "Archivo services/api/data/localito.db en desarrollo; :memory: en tests. Esquema creado al arrancar.",
+        "boundaries": "Acceso sólo a través de repositorios. El archivo de datos está ignorado por git."
+      },
+      {
+        "id": "C04",
+        "name": "LedgerPort (interfaz de libro mayor)",
+        "owner": "backend",
+        "responsibility": "Contrato interno para leer saldos y aplicar transferencias atómicas. Implementación actual: SqliteLedger.",
+        "boundaries": "Permite sustituir la implementación por un adaptador onchain en el futuro sin cambiar rutas ni contrato HTTP."
+      },
+      {
+        "id": "C05",
+        "name": "Adaptador onchain (futuro)",
+        "owner": "backend",
+        "responsibility": "Implementación futura de LedgerPort sobre Avalanche y el fondo en USDC. No existe en el demo.",
+        "boundaries": "DIFERIDO. Ningún contrato inteligente, wallet ni RPC se implementa en esta etapa."
+      }
+    ],
+    "boundaries": [
+      "El front no es fuente de verdad de saldos ni de límites.",
+      "La API valida y aplica reglas en una única transacción SQLite por pago.",
+      "Los datos personales no se exponen en respuestas de terceros: /participants devuelve alias, nombre visible y estado, nada más.",
+      "El contrato HTTP (docs/api-contract.md) es el único punto de acoplamiento entre backend y front; está congelado para el demo."
+    ],
+    "data_flow": {
+      "payment": [
+        "1. El front pide GET /me y muestra saldo, disponible y capacidad de recepción.",
+        "2. El usuario elige destinatario por alias o desde GET /participants.",
+        "3. El front envía POST /payments con amount_cents, note e Idempotency-Key.",
+        "4. La API autentica el token, valida el body con zod y abre una transacción SQLite.",
+        "5. LedgerPort verifica estado de ambos participantes, límite del emisor y tope del receptor.",
+        "6. LedgerPort aplica el débito y el crédito, inserta la transacción y los dos asientos, y confirma el commit.",
+        "7. La API responde 201 con la transacción, los saldos resultantes e idempotent_replay.",
+        "8. El front refresca GET /me y GET /transactions; el comercio ve el cobro al refrescar."
+      ],
+      "replay": [
+        "1. El front reintenta con la misma Idempotency-Key.",
+        "2. La API busca la clave para ese emisor.",
+        "3. Si el body coincide, devuelve la transacción existente con idempotent_replay=true y no mueve saldos.",
+        "4. Si el body difiere, responde 409 IDEMPOTENCY_CONFLICT."
+      ]
+    },
+    "monorepo_layout": {
+      "root": [
+        "AGENTS.md",
+        "docs/",
+        "apps/web/ (PWA de Oky)",
+        "services/api/ (backend del demo)"
+      ],
+      "services_api": [
+        "package.json, tsconfig.json, vitest.config.ts",
+        "src/server.ts (arranque Fastify)",
+        "src/routes/ (health, auth, participants, payments, transactions, stats, demo)",
+        "src/domain/ (ledger, payments, errors, schemas zod)",
+        "src/repo/ (participants, transactions, sessions; SqliteLedger)",
+        "src/plugins/ (auth, error-handler, cors)",
+        "test/ (unit, integration, contract)",
+        "data/ (localito.db, ignorado por git)"
+      ],
+      "notes": [
+        "No se toca apps/web desde el backend.",
+        "No se agrega carpeta contracts/ ni generación de tipos en el demo: el contrato es markdown y los tests validan la forma."
+      ]
+    },
+    "ledger_interface": {
+      "purpose": "Aislar la contabilidad del transporte HTTP y dejar preparado el reemplazo por una implementación onchain.",
+      "operations": [
+        {
+          "name": "get_participant",
+          "input": "participant_id",
+          "output": "saldo, límite de crédito, tope positivo, estado"
+        },
+        {
+          "name": "apply_payment",
+          "input": "from_id, to_id, amount_cents, note, idempotency_key, now",
+          "output": "transaction_id, balance_after_cents, counterparty_balance_after_cents",
+          "guarantees": "Atómico, idempotente por clave, rechaza si viola cualquier invariante."
+        },
+        {
+          "name": "list_entries",
+          "input": "participant_id, limit",
+          "output": "movimientos ordenados por fecha descendente"
+        },
+        {
+          "name": "circuit_totals",
+          "output": "participant_count, transaction_count, total_volume_cents, sum_balances_cents"
+        }
+      ],
+      "future_onchain": {
+        "status": "DIFERIDO",
+        "description": "Un OnchainLedgerAdapter implementaría las mismas operaciones sobre contratos en Avalanche y el fondo en USDC. Requiere decisiones O4, G04 y O8, y no forma parte del MVP demostrable.",
+        "unchanged": "Rutas, DTOs y contrato HTTP no cambian si se sustituye la implementación."
+      }
+    },
+    "no_smart_contracts_now": "El demo no despliega contratos, no usa wallets ni RPC. Toda la contabilidad es SQLite con asientos append-only. La arquitectura onchain del documento fuente queda como intención futura detrás de LedgerPort."
+  },
+  "domain_model": {
+    "entities": [
+      {
+        "name": "participant",
+        "description": "Miembro del circuito: persona o comercio con saldo con signo.",
+        "fields": [
+          "id (p_<alias>)",
+          "alias (único, usado para login y para pagar)",
+          "display_name",
+          "role (member | merchant)",
+          "status (active en el demo; el modelo admite pending, suspended, delinquent, defaulted, exited)",
+          "balance_cents (con signo)",
+          "credit_limit_cents (cuánto puede bajar el saldo)",
+          "max_positive_cents (tope de saldo positivo)"
+        ],
+        "derived": [
+          "available_cents = balance_cents + credit_limit_cents",
+          "receive_capacity_cents = max_positive_cents - balance_cents"
+        ]
+      },
+      {
+        "name": "transaction",
+        "description": "Pago confirmado entre dos participantes. En el demo es la única clase de movimiento.",
+        "fields": [
+          "id (tx_...)",
+          "from_participant_id, to_participant_id",
+          "amount_cents (> 0)",
+          "currency (localito)",
+          "note (opcional)",
+          "status (confirmed)",
+          "idempotency_key (opcional, única por emisor)",
+          "created_at"
+        ]
+      },
+      {
+        "name": "ledger_entry",
+        "description": "Asiento append-only del libro mayor. Cada pago genera exactamente dos asientos de signo opuesto.",
+        "fields": [
+          "id (autoincremental)",
+          "transaction_id",
+          "participant_id",
+          "delta_cents (distinto de cero)",
+          "balance_after_cents",
+          "kind (payment_out | payment_in)",
+          "created_at"
+        ]
+      },
+      {
+        "name": "session",
+        "description": "Sesión de demo asociada a un participante. El token se guarda hasheado.",
+        "fields": [
+          "token_hash (clave primaria)",
+          "participant_id",
+          "created_at",
+          "expires_at"
+        ]
+      }
+    ],
+    "invariants": [
+      {
+        "id": "INV-01",
+        "name": "suma cero",
+        "statement": "La suma de balance_cents de todos los participantes es exactamente 0 en todo momento. La suma de delta_cents del libro mayor también es 0.",
+        "enforcement": "Un pago es siempre un par débito/crédito del mismo monto dentro de una transacción SQLite; se verifica además en GET /stats y en tests."
+      },
+      {
+        "id": "INV-02",
+        "name": "límite de crédito",
+        "statement": "balance_cents - amount_cents >= -credit_limit_cents para el emisor.",
+        "enforcement": "Chequeo previo dentro de la transacción; error INSUFFICIENT_CREDIT con shortfall_cents."
+      },
+      {
+        "id": "INV-03",
+        "name": "tope de recepción",
+        "statement": "balance_cents + amount_cents <= max_positive_cents para el receptor.",
+        "enforcement": "Chequeo previo dentro de la transacción; error RECEIVER_LIMIT con receive_capacity_cents."
+      },
+      {
+        "id": "INV-04",
+        "name": "idempotencia",
+        "statement": "Misma Idempotency-Key + mismo body para el mismo emisor devuelve la misma transacción sin mover saldos. Misma clave con body distinto devuelve IDEMPOTENCY_CONFLICT.",
+        "enforcement": "Índice único (from_participant_id, idempotency_key) y comparación de amount/to/note."
+      },
+      {
+        "id": "INV-05",
+        "name": "atomicidad",
+        "statement": "Un pago se aplica completo o no se aplica: no existen débitos sin crédito ni transacciones sin asientos.",
+        "enforcement": "BEGIN IMMEDIATE / COMMIT en SQLite; rollback ante cualquier error."
+      },
+      {
+        "id": "INV-06",
+        "name": "sin autopago",
+        "statement": "from_participant_id != to_participant_id.",
+        "enforcement": "Validación en dominio; error SELF_PAYMENT."
+      },
+      {
+        "id": "INV-07",
+        "name": "precisión",
+        "statement": "Los montos son enteros en centavos; no se aceptan decimales en el body ni se usan floats.",
+        "enforcement": "zod int() positivo; columnas INTEGER."
+      },
+      {
+        "id": "INV-08",
+        "name": "estado habilita operación",
+        "statement": "Emisor y receptor deben estar en estado active para operar. En el demo todos los participantes del seed están activos; el chequeo existe para no bloquear el desarrollo futuro.",
+        "enforcement": "Validación en dominio; error PARTICIPANT_INACTIVE (409)."
+      },
+      {
+        "id": "INV-09",
+        "name": "libro inmutable",
+        "statement": "Los asientos no se actualizan ni se borran; las correcciones futuras se harán con asientos compensatorios (G01 pendiente).",
+        "enforcement": "Sin UPDATE ni DELETE sobre ledger_entries en el código; reset de demo borra todo el dataset de forma explícita y auditada como operación de demo."
+      }
+    ]
+  },
+  "data_model": {
+    "engine": "node:sqlite (módulo integrado de Node 24), sin ORM.",
+    "pragmas": [
+      "PRAGMA foreign_keys = ON",
+      "PRAGMA journal_mode = WAL (archivo); :memory: en tests",
+      "PRAGMA busy_timeout = 5000"
+    ],
+    "tables": [
+      {
+        "name": "participants",
+        "columns": [
+          {
+            "name": "id",
+            "type": "TEXT",
+            "constraints": "PRIMARY KEY"
+          },
+          {
+            "name": "alias",
+            "type": "TEXT",
+            "constraints": "NOT NULL UNIQUE"
+          },
+          {
+            "name": "display_name",
+            "type": "TEXT",
+            "constraints": "NOT NULL"
+          },
+          {
+            "name": "role",
+            "type": "TEXT",
+            "constraints": "NOT NULL CHECK (role IN ('member','merchant'))"
+          },
+          {
+            "name": "status",
+            "type": "TEXT",
+            "constraints": "NOT NULL DEFAULT 'active' CHECK (status IN ('pending','active','suspended','delinquent','defaulted','exited'))"
+          },
+          {
+            "name": "balance_cents",
+            "type": "INTEGER",
+            "constraints": "NOT NULL DEFAULT 0"
+          },
+          {
+            "name": "credit_limit_cents",
+            "type": "INTEGER",
+            "constraints": "NOT NULL CHECK (credit_limit_cents >= 0)"
+          },
+          {
+            "name": "max_positive_cents",
+            "type": "INTEGER",
+            "constraints": "NOT NULL CHECK (max_positive_cents >= 0)"
+          },
+          {
+            "name": "created_at",
+            "type": "TEXT",
+            "constraints": "NOT NULL"
+          }
+        ],
+        "indexes": [
+          "UNIQUE (alias)",
+          "INDEX idx_participants_display_name ON participants(display_name)"
+        ],
+        "notes": "El alias es la identidad visible y el destino de pago del demo. No se guardan datos fiscales ni personales en el demo."
+      },
+      {
+        "name": "transactions",
+        "columns": [
+          {
+            "name": "id",
+            "type": "TEXT",
+            "constraints": "PRIMARY KEY"
+          },
+          {
+            "name": "from_participant_id",
+            "type": "TEXT",
+            "constraints": "NOT NULL REFERENCES participants(id)"
+          },
+          {
+            "name": "to_participant_id",
+            "type": "TEXT",
+            "constraints": "NOT NULL REFERENCES participants(id)"
+          },
+          {
+            "name": "amount_cents",
+            "type": "INTEGER",
+            "constraints": "NOT NULL CHECK (amount_cents > 0)"
+          },
+          {
+            "name": "currency",
+            "type": "TEXT",
+            "constraints": "NOT NULL DEFAULT 'localito'"
+          },
+          {
+            "name": "note",
+            "type": "TEXT",
+            "constraints": "NULL"
+          },
+          {
+            "name": "status",
+            "type": "TEXT",
+            "constraints": "NOT NULL DEFAULT 'confirmed' CHECK (status IN ('confirmed'))"
+          },
+          {
+            "name": "idempotency_key",
+            "type": "TEXT",
+            "constraints": "NULL"
+          },
+          {
+            "name": "created_at",
+            "type": "TEXT",
+            "constraints": "NOT NULL"
+          }
+        ],
+        "indexes": [
+          "UNIQUE (from_participant_id, idempotency_key)",
+          "INDEX idx_transactions_from_created ON transactions(from_participant_id, created_at DESC)",
+          "INDEX idx_transactions_to_created ON transactions(to_participant_id, created_at DESC)"
+        ],
+        "notes": "El UNIQUE con NULL permite múltiples pagos sin clave de idempotencia (SQLite trata NULL como distinto)."
+      },
+      {
+        "name": "ledger_entries",
+        "columns": [
+          {
+            "name": "id",
+            "type": "INTEGER",
+            "constraints": "PRIMARY KEY AUTOINCREMENT"
+          },
+          {
+            "name": "transaction_id",
+            "type": "TEXT",
+            "constraints": "NOT NULL REFERENCES transactions(id)"
+          },
+          {
+            "name": "participant_id",
+            "type": "TEXT",
+            "constraints": "NOT NULL REFERENCES participants(id)"
+          },
+          {
+            "name": "delta_cents",
+            "type": "INTEGER",
+            "constraints": "NOT NULL CHECK (delta_cents <> 0)"
+          },
+          {
+            "name": "balance_after_cents",
+            "type": "INTEGER",
+            "constraints": "NOT NULL"
+          },
+          {
+            "name": "kind",
+            "type": "TEXT",
+            "constraints": "NOT NULL CHECK (kind IN ('payment_out','payment_in'))"
+          },
+          {
+            "name": "created_at",
+            "type": "TEXT",
+            "constraints": "NOT NULL"
+          }
+        ],
+        "indexes": [
+          "INDEX idx_ledger_participant ON ledger_entries(participant_id, id DESC)",
+          "INDEX idx_ledger_transaction ON ledger_entries(transaction_id)"
+        ],
+        "notes": "Append-only. Los saldos de participants son la vista materializada del último asiento; los tests verifican que coincidan."
+      },
+      {
+        "name": "sessions",
+        "columns": [
+          {
+            "name": "token_hash",
+            "type": "TEXT",
+            "constraints": "PRIMARY KEY"
+          },
+          {
+            "name": "participant_id",
+            "type": "TEXT",
+            "constraints": "NOT NULL REFERENCES participants(id)"
+          },
+          {
+            "name": "created_at",
+            "type": "TEXT",
+            "constraints": "NOT NULL"
+          },
+          {
+            "name": "expires_at",
+            "type": "TEXT",
+            "constraints": "NOT NULL"
+          }
+        ],
+        "indexes": [
+          "INDEX idx_sessions_participant ON sessions(participant_id)"
+        ],
+        "notes": "Se guarda el sha256 del token, no el token en claro. TTL de demo: 24 horas, configurable."
+      }
+    ],
+    "deferred_tables": [
+      "audit_log (acciones administrativas con valor anterior y nuevo)",
+      "membership_fees, penalties (cuotas y penalidades)",
+      "fund_positions, fund_entries, withdrawal_queue (Fondo de Garantía)",
+      "delinquency_clock / debt_aging (reloj de deuda y mora)",
+      "write_offs (deuda castigada, cuenta compensatoria para mantener suma cero)"
+    ],
+    "seed": {
+      "participants": [
+        {
+          "alias": "ana",
+          "display_name": "Ana",
+          "role": "member",
+          "balance_cents": 0,
+          "credit_limit_cents": 50000,
+          "max_positive_cents": 100000
+        },
+        {
+          "alias": "bruno",
+          "display_name": "Bruno",
+          "role": "member",
+          "balance_cents": 0,
+          "credit_limit_cents": 50000,
+          "max_positive_cents": 100000
+        },
+        {
+          "alias": "kiosco",
+          "display_name": "Kiosco La Esquina",
+          "role": "merchant",
+          "balance_cents": 0,
+          "credit_limit_cents": 50000,
+          "max_positive_cents": 100000
+        },
+        {
+          "alias": "cafe",
+          "display_name": "Café Central",
+          "role": "merchant",
+          "balance_cents": 0,
+          "credit_limit_cents": 50000,
+          "max_positive_cents": 100000
+        },
+        {
+          "alias": "foto",
+          "display_name": "Fotocopias Norte",
+          "role": "merchant",
+          "balance_cents": 0,
+          "credit_limit_cents": 50000,
+          "max_positive_cents": 100000
+        }
+      ],
+      "note": "Coincide exactamente con docs/api-contract.md. El seed es idempotente: no duplica participantes al reiniciar."
+    }
+  },
+  "api": {
+    "reference": "docs/api-contract.md",
+    "contract_status": "congelado para el flujo mínimo demostrable",
+    "base_url": "http://localhost:3001/api",
+    "format": "JSON UTF-8; montos enteros en centavos",
+    "auth": "Authorization: Bearer <token> en todo salvo GET /health y POST /auth/demo",
+    "endpoints": [
+      {
+        "method": "GET",
+        "path": "/health",
+        "auth": false,
+        "purpose": "Estado del servicio y versión.",
+        "success": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/demo",
+        "auth": false,
+        "purpose": "Login de demo por alias; crea sesión y devuelve token + participante.",
+        "success": 200,
+        "errors": [
+          "NOT_FOUND"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/me",
+        "auth": true,
+        "purpose": "Participante autenticado con saldo, límite, disponible y capacidad de recepción.",
+        "success": 200,
+        "errors": [
+          "UNAUTHORIZED"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/participants",
+        "auth": true,
+        "purpose": "Listado o búsqueda por alias/nombre, máximo 20.",
+        "success": 200,
+        "errors": [
+          "UNAUTHORIZED"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/payments",
+        "auth": true,
+        "purpose": "Pago entre participantes con Idempotency-Key opcional.",
+        "success": 201,
+        "errors": [
+          "VALIDATION_ERROR",
+          "UNAUTHORIZED",
+          "NOT_FOUND",
+          "SELF_PAYMENT",
+          "PARTICIPANT_INACTIVE",
+          "INSUFFICIENT_CREDIT",
+          "RECEIVER_LIMIT",
+          "IDEMPOTENCY_CONFLICT"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/transactions",
+        "auth": true,
+        "purpose": "Movimientos del usuario autenticado, más recientes primero, limit máximo 100.",
+        "success": 200,
+        "errors": [
+          "UNAUTHORIZED"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/transactions/:id",
+        "auth": true,
+        "purpose": "Detalle/recibo si el usuario participó; 404 si no existe o no participó.",
+        "success": 200,
+        "errors": [
+          "UNAUTHORIZED",
+          "NOT_FOUND"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/stats",
+        "auth": true,
+        "purpose": "Indicador de circularidad y verificación de suma cero.",
+        "success": 200,
+        "errors": [
+          "UNAUTHORIZED"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/demo/reset",
+        "auth": true,
+        "purpose": "Reset de datos de demo, sólo con DEMO_MODE=true y body {confirm:'reset'}.",
+        "success": 200,
+        "errors": [
+          "UNAUTHORIZED",
+          "VALIDATION_ERROR",
+          "NOT_FOUND"
+        ]
+      }
+    ],
+    "error_model": {
+      "shape": "{ error: { code, message, details? } }",
+      "message_language": "es-AR, apto para mostrar al usuario",
+      "codes": [
+        {
+          "code": "VALIDATION_ERROR",
+          "http": 422,
+          "when": "body inválido, monto <= 0, alias faltante",
+          "details": "issues"
+        },
+        {
+          "code": "UNAUTHORIZED",
+          "http": 401,
+          "when": "token ausente o inválido",
+          "details": null
+        },
+        {
+          "code": "NOT_FOUND",
+          "http": 404,
+          "when": "alias o destinatario inexistente; transacción ajena o inexistente",
+          "details": null
+        },
+        {
+          "code": "SELF_PAYMENT",
+          "http": 422,
+          "when": "el destinatario es el mismo usuario",
+          "details": null
+        },
+        {
+          "code": "PARTICIPANT_INACTIVE",
+          "http": 409,
+          "when": "emisor o receptor no está active",
+          "details": "participant"
+        },
+        {
+          "code": "INSUFFICIENT_CREDIT",
+          "http": 422,
+          "when": "el emisor no tiene margen",
+          "details": "available_cents, requested_cents, shortfall_cents"
+        },
+        {
+          "code": "RECEIVER_LIMIT",
+          "http": 422,
+          "when": "el receptor llegaría a su tope positivo",
+          "details": "receive_capacity_cents, requested_cents"
+        },
+        {
+          "code": "IDEMPOTENCY_CONFLICT",
+          "http": 409,
+          "when": "misma clave con body distinto",
+          "details": null
+        }
+      ],
+      "rules": [
+        "Nunca devolver stack traces ni nombres de tablas.",
+        "Los códigos son estables para tests y lógica del front; los mensajes pueden mejorar sin romper.",
+        "El front muestra error.message y usa error.code sólo para estados especiales."
+      ]
+    },
+    "contract_rules": [
+      "No se agregan ni renombran campos sin avisar a Oky primero.",
+      "Los montos viajan como enteros en centavos (amount_cents, balance_cents, available_cents).",
+      "GET /transactions devuelve sólo movimientos del autenticado; nunca datos de terceros.",
+      "Sin websockets ni push en v0: el comercio refresca.",
+      "CORS: orígenes locales permitidos con DEMO_MODE=true; lista explícita en CORS_ORIGINS fuera de demo."
+    ]
+  },
+  "decisions": {
+    "stack": [
+      {
+        "id": "DS-01",
+        "decision": "Node 24 con TypeScript en ESM",
+        "status": "DECIDIDO",
+        "rationale": "node:sqlite y APIs modernas sin transpilador ni bundler en el backend; el runtime ya está disponible."
+      },
+      {
+        "id": "DS-02",
+        "decision": "Fastify 5",
+        "status": "DECIDIDO",
+        "rationale": "Arranque rápido, validación por schema, logging estructurado y bajo consumo; suficiente para 9 endpoints."
+      },
+      {
+        "id": "DS-03",
+        "decision": "zod 4 para validación de entrada",
+        "status": "DECIDIDO",
+        "rationale": "Mensajes de error consistentes y tipos derivados sin duplicar definiciones."
+      },
+      {
+        "id": "DS-04",
+        "decision": "node:sqlite sin ORM",
+        "status": "DECIDIDO",
+        "rationale": "Cero dependencias nativas, transacciones simples y esquema explícito de 4 tablas."
+      },
+      {
+        "id": "DS-05",
+        "decision": "vitest para unit e integración",
+        "status": "DECIDIDO",
+        "rationale": "Rápido, ESM nativo; tests de integración con app.inject() de Fastify."
+      },
+      {
+        "id": "DS-06",
+        "decision": "REST JSON en /api, sin GraphQL ni tRPC",
+        "status": "DECIDIDO",
+        "rationale": "Contrato congelado y legible; Oky consume HTTP plano desde la PWA."
+      },
+      {
+        "id": "DS-07",
+        "decision": "PWA como único canal; no se prescribe su stack",
+        "status": "DECIDIDO",
+        "rationale": "Decisión de Oky; el backend sólo garantiza CORS y el contrato."
+      },
+      {
+        "id": "DS-08",
+        "decision": "Moneda de demo: unidad localito, 1 unidad = 1 ARS nominal, montos en centavos",
+        "status": "PROVISIONAL",
+        "rationale": "Permite mostrar montos realistas; no resuelve O1."
+      }
+    ],
+    "provisional_defaults": [
+      {
+        "id": "O1",
+        "question": "Unidad de cuenta del circuito",
+        "demo_default": "1 unidad = 1 ARS nominal; se muestra como unidad localito y los montos se manejan en centavos enteros.",
+        "label": "PROVISIONAL",
+        "burden": "Bloquea el alcance completo: precisión, presentación y calibración dependen de esta decisión.",
+        "change_cost": "Bajo en el demo si se mantiene un único punto de formateo; medio en datos históricos."
+      },
+      {
+        "id": "O2",
+        "question": "Plazo de saldado de deuda",
+        "demo_default": "No se implementa mora ni vencimiento. El seed sólo guarda created_at; no hay reloj de deuda.",
+        "label": "PROVISIONAL",
+        "burden": "Bloquea S10 y AC-09/AC-10/AC-11.",
+        "change_cost": "Nulo en el demo: no hay lógica de plazos."
+      },
+      {
+        "id": "O3",
+        "question": "Moneda de cobro de cuotas de membresía",
+        "demo_default": "No se cobran cuotas en el demo.",
+        "label": "PROVISIONAL",
+        "burden": "Bloquea S13, UC-16 y AC-14.",
+        "change_cost": "Nulo en el demo."
+      },
+      {
+        "id": "O4",
+        "question": "Mecanismo de compensación ante incumplimiento",
+        "demo_default": "No existe Fondo ni compensación. Ninguna operación del demo toca USDC.",
+        "label": "PROVISIONAL",
+        "burden": "Bloquea S11, S12, UC-12, AC-13.",
+        "change_cost": "Alto: requiere dominio de Fondo y equivalencia de unidades."
+      },
+      {
+        "id": "G01",
+        "question": "Reversión, anulación o disputa de un pago",
+        "demo_default": "Un pago confirmado es irreversible. No hay endpoint de reversión ni edición de asientos.",
+        "label": "PROVISIONAL",
+        "burden": "Bloquea cualquier promesa de reversibilidad y el tratamiento de disputas.",
+        "change_cost": "Alto: obliga a definir asientos compensatorios y auditoría."
+      },
+      {
+        "id": "G03",
+        "question": "Valor concreto de la penalidad por mora",
+        "demo_default": "No se calculan penalidades.",
+        "label": "PROVISIONAL",
+        "burden": "Bloquea S13 y AC-14 en su parte de penalidad.",
+        "change_cost": "Bajo: parámetro configurable cuando exista decisión."
+      },
+      {
+        "id": "G04",
+        "question": "Equivalencia entre unidades del circuito y USDC del Fondo",
+        "demo_default": "No hay equivalencia: el demo no usa USDC.",
+        "label": "PROVISIONAL",
+        "burden": "Bloquea compensación, valor de la participación y adaptador onchain.",
+        "change_cost": "Alto: define la contabilidad del Fondo."
+      }
+    ],
+    "deferred_items": [
+      {
+        "id": "D-01",
+        "item": "Stablecoin y USDC del Fondo",
+        "status": "DIFERIDO",
+        "reason": "Fuera del alcance del demo (X02, D6)."
+      },
+      {
+        "id": "D-02",
+        "item": "Off-ramp de saldo a pesos o USDC",
+        "status": "DIFERIDO",
+        "reason": "Prohibido por D6 y X01; la app no debe ofrecer canje."
+      },
+      {
+        "id": "D-03",
+        "item": "WhatsApp o mensajería conversacional",
+        "status": "DIFERIDO",
+        "reason": "Excluido por D5 y X04."
+      },
+      {
+        "id": "D-04",
+        "item": "Contratos inteligentes y adaptador onchain en Avalanche",
+        "status": "DIFERIDO",
+        "reason": "Se deja sólo la interfaz LedgerPort; implementación futura."
+      },
+      {
+        "id": "D-05",
+        "item": "Fondo de Garantía y vista de inversor",
+        "status": "DIFERIDO",
+        "reason": "Depende de O3, O4, O8 y G04."
+      },
+      {
+        "id": "D-06",
+        "item": "Consola de broker/operador y auditoría",
+        "status": "DIFERIDO",
+        "reason": "No es necesario para el circuito mínimo; requiere roles y permisos."
+      },
+      {
+        "id": "D-07",
+        "item": "Notificaciones email/push",
+        "status": "DIFERIDO",
+        "reason": "El demo es presencial y síncrono; el comercio refresca."
+      }
+    ]
+  },
+  "non_functional": {
+    "security_privacy": [
+      "Tokens de demo opacos (UUID) guardados como sha256; nunca se loguean tokens ni cuerpos completos de pago.",
+      "Sin secretos en el repositorio: configuración por variables de entorno (.env no versionado).",
+      "DEMO_MODE habilita /demo/reset y CORS amplio; debe estar apagado fuera de desarrollo.",
+      "GET /transactions y /transactions/:id sólo devuelven datos del autenticado; un participante no ve movimientos ajenos.",
+      "Los datos personales no se incluyen en el demo; sólo alias y nombre visible.",
+      "Toda escritura deja rastro en transactions + ledger_entries con fecha UTC; no hay acciones silenciosas.",
+      "No se aceptan claves privadas ni credenciales onchain en esta etapa.",
+      "Los errores no revelan esquema interno, rutas de archivo ni stack traces."
+    ],
+    "performance": [
+      "Objetivo local: p95 < 300 ms para /payments y < 100 ms para lecturas con 5 participantes y hasta 10.000 movimientos.",
+      "Todas las consultas del contrato usan índices declarados; sin escaneos completos en el camino de pago.",
+      "Un pago realiza un número acotado de queries (participantes, inserción de transacción, dos asientos, update de saldos).",
+      "El front no necesita paginación en el demo (limit por defecto 50, máximo 100)."
+    ],
+    "reliability": [
+      "Cada pago es una transacción SQLite atómica; fallo total o commit total.",
+      "Idempotencia por clave evita duplicados ante reintentos de red.",
+      "Esquema creado al arrancar de forma idempotente; seed no duplica participantes.",
+      "health check sin auth para verificar el servicio antes de la demo.",
+      "Backup del demo: el archivo SQLite puede copiarse; /demo/reset reconstruye el estado base."
+    ],
+    "observability": [
+      "Logging estructurado de Fastify con request id, método, ruta, status y duración.",
+      "Los eventos de negocio se registran sin PII: transaction_id, participant_id, amount_cents, resultado.",
+      "GET /stats expone participant_count, transaction_count, total_volume_cents, sum_balances_cents y zero_sum_ok.",
+      "Los errores de validación se registran con code y ruta, no con el token."
+    ],
+    "accessibility_basics": [
+      "La API devuelve mensajes en español listos para mostrar, sin códigos internos.",
+      "Contraste, foco visible, etiquetas de formulario y tamaños legibles son responsabilidad del front (Oky); el backend no los condiciona.",
+      "Los errores indican causa y acción siguiente, no sólo el rechazo.",
+      "El flujo de pago tolera reintentos sin duplicar y muestra progreso."
+    ],
+    "compatibility": [
+      "Node 24 LTS en el entorno de desarrollo y demo.",
+      "SQLite local sin extensiones; no requiere servicio externo.",
+      "Front servido en http://localhost:3000 o :5173 para CORS de desarrollo."
+    ]
+  },
+  "test_strategy": {
+    "levels": [
+      {
+        "level": "unit",
+        "tool": "vitest",
+        "scope": "Dominio puro: cálculo de available_cents y receive_capacity_cents, validaciones de monto, límite y tope, comparación de bodies para idempotencia, mapeo de errores.",
+        "notes": "Sin base de datos; funciones deterministas."
+      },
+      {
+        "level": "integration",
+        "tool": "vitest + app.inject() de Fastify",
+        "scope": "Cada endpoint contra SQLite :memory: con seed; incluye auth, 404, validaciones y códigos HTTP.",
+        "notes": "Un archivo por área: auth, participants, payments, transactions, stats, demo."
+      },
+      {
+        "level": "contract",
+        "tool": "vitest",
+        "scope": "Forma exacta de las respuestas y del objeto error según docs/api-contract.md: campos, tipos, nombres y códigos.",
+        "notes": "Falla si se agrega o renombra un campo sin actualizar el contrato y avisar a Oky."
+      },
+      {
+        "level": "e2e_manual",
+        "tool": "guion reproducible",
+        "scope": "Ana paga al kiosco desde la PWA; ambos ven saldo e historial; /stats muestra zero_sum_ok=true.",
+        "notes": "Se ejecuta en el ensayo de demo, no en CI."
+      }
+    ],
+    "ledger_invariant_tests": [
+      "Suma de balances = 0 después de cada pago y después de N pagos aleatorios entre participantes.",
+      "La suma de delta_cents del ledger es 0 y coincide con la suma de balances.",
+      "balance_after_cents del último asiento de cada participante coincide con participants.balance_cents.",
+      "Un pago que dejaría al emisor por debajo del límite no crea transacción ni asientos.",
+      "Un pago que superaría el tope del receptor no crea transacción ni asientos.",
+      "Un pago rechazado no modifica ningún saldo (verificación antes/después).",
+      "Un pago exactamente en el límite se acepta y deja el saldo en -credit_limit_cents.",
+      "Dos reintentos con la misma clave producen una sola transacción y una sola pareja de asientos.",
+      "Misma clave con body distinto devuelve 409 y no altera saldos.",
+      "Pago a sí mismo se rechaza sin efectos.",
+      "Pago con monto 0 o negativo se rechaza en validación."
+    ],
+    "contract_tests": [
+      "GET /health: status, service, version, time.",
+      "POST /auth/demo: token string y participante con los 9 campos del contrato.",
+      "GET /me: mismos campos que el participante del login.",
+      "GET /participants: array participants con máximo 20 y filtro por q.",
+      "POST /payments 201: transaction con from/to anidados, currency localito, balance_after_cents e idempotent_replay booleano.",
+      "Errores: objeto único { error: { code, message, details } } para cada código documentado.",
+      "GET /transactions: direction in/out y counterparty con alias y display_name.",
+      "GET /transactions/:id: 404 cuando el usuario no participó.",
+      "GET /stats: zero_sum_ok booleano y suma de balances.",
+      "POST /demo/reset: 200 con { reset: true } y rechazo si DEMO_MODE=false."
+    ],
+    "manual_demo_script": [
+      "1. Arrancar API en :3001 y PWA en :3000.",
+      "2. Ejecutar /demo/reset para estado limpio.",
+      "3. Entrar como ana; verificar saldo 0, límite 50.000 y disponible 50.000 (en unidades mostradas).",
+      "4. Buscar kiosco en el directorio y abrir el pago.",
+      "5. Pagar 1.500 con nota 'Compra de demo'.",
+      "6. Ver el recibo con saldo resultante -1.500.",
+      "7. Entrar como kiosco en otra pestaña; verificar saldo 1.500 y el cobro en el historial.",
+      "8. Abrir /stats; verificar sum_balances_cents = 0 y zero_sum_ok = true.",
+      "9. Repetir el pago con un monto mayor al disponible y mostrar el mensaje accionable.",
+      "10. Reintentar el mismo pago con la misma Idempotency-Key y verificar que no se duplica."
+    ],
+    "quality_gates": [
+      "Todos los tests de integración y de invariantes en verde antes de la demo.",
+      "Cero usos de as any, ts-ignore o supresión de tipos.",
+      "Contrato validado con tests; cualquier cambio avisado a Oky.",
+      "Revisión manual del guion de demo completo al menos una vez."
+    ]
+  },
+  "risks": [
+    {
+      "id": "R01",
+      "risk": "Los tokens de demo son débiles y no sirven como autenticación real.",
+      "impact": "Medio",
+      "mitigation": "Demo sin dinero real, DEMO_MODE apagado fuera de desarrollo, tokens hasheados y TTL corto; O7/O9 quedan abiertos y bloquean producción."
+    },
+    {
+      "id": "R02",
+      "risk": "La unidad de cuenta (O1) no está decidida y los montos mostrados podrían inducir a error.",
+      "impact": "Medio",
+      "mitigation": "Montos en centavos enteros, un único punto de formateo en el front y etiqueta explícita de unidad localito; O1 marcado como provisional y bloqueante del alcance completo."
+    },
+    {
+      "id": "R03",
+      "risk": "Pagos concurrentes podrían violar el límite o el tope por lectura y escritura no atómicas.",
+      "impact": "Alto",
+      "mitigation": "BEGIN IMMEDIATE, chequeo y escritura en la misma transacción, pruebas de concurrencia básicas y una sola instancia de API en el demo."
+    },
+    {
+      "id": "R04",
+      "risk": "Reutilización de Idempotency-Key con un body distinto.",
+      "impact": "Medio",
+      "mitigation": "Comparación de amount, to y note; índice único por emisor; respuesta 409 IDEMPOTENCY_CONFLICT sin mover saldos."
+    },
+    {
+      "id": "R05",
+      "risk": "Deriva entre el contrato y la implementación del front de Oky.",
+      "impact": "Alto",
+      "mitigation": "Contrato congelado en docs/api-contract.md, tests de contrato en la API y aviso obligatorio antes de cualquier cambio de forma."
+    },
+    {
+      "id": "R06",
+      "risk": "node:sqlite es una API relativamente nueva y puede cambiar entre versiones de Node.",
+      "impact": "Bajo",
+      "mitigation": "Fijar la versión de Node en el repo, encapsular el acceso en repositorios y no usar APIs experimentales fuera de lo necesario."
+    },
+    {
+      "id": "R07",
+      "risk": "El reset de demo borra datos durante la presentación.",
+      "impact": "Medio",
+      "mitigation": "Requiere body {confirm:'reset'}, sólo con DEMO_MODE=true, y el guion de demo indica resetear antes de empezar."
+    },
+    {
+      "id": "R08",
+      "risk": "Expansión de alcance hacia Fondo, stablecoin o onchain antes de cerrar el circuito mínimo.",
+      "impact": "Alto",
+      "mitigation": "Fase 5 bloqueada explícitamente, decisiones provisionales marcadas y gate que exige aprobación de spec técnica y todos."
+    },
+    {
+      "id": "R09",
+      "risk": "Pérdida de datos por archivo SQLite corrupto o borrado accidental.",
+      "impact": "Bajo",
+      "mitigation": "WAL, seed idempotente, copia del archivo antes de la demo y reset reproducible."
+    }
+  ],
+  "traceability": [
+    {
+      "scope": "S01",
+      "use_cases": [
+        "UC-04"
+      ],
+      "acceptance_criteria": [
+        "AC-03",
+        "AC-12"
+      ],
+      "demo": "incluido",
+      "note": "Suma cero verificada en /stats y en tests de invariantes."
+    },
+    {
+      "scope": "S02",
+      "use_cases": [
+        "UC-08",
+        "UC-19"
+      ],
+      "acceptance_criteria": [
+        "AC-03",
+        "AC-26"
+      ],
+      "demo": "parcial",
+      "note": "Historial y asientos incluidos; auditoría administrativa diferida."
+    },
+    {
+      "scope": "S03",
+      "use_cases": [
+        "UC-01"
+      ],
+      "acceptance_criteria": [
+        "AC-01"
+      ],
+      "demo": "diferido",
+      "note": "El demo usa seed, no alta por broker."
+    },
+    {
+      "scope": "S04",
+      "use_cases": [
+        "UC-01",
+        "UC-02",
+        "UC-03",
+        "UC-09",
+        "UC-10",
+        "UC-11"
+      ],
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-07",
+        "AC-10",
+        "AC-12"
+      ],
+      "demo": "parcial",
+      "note": "Modelo de estado existe y se valida active; transiciones y ciclo de vida completo diferidos."
+    },
+    {
+      "scope": "S05",
+      "use_cases": [
+        "UC-02",
+        "UC-03",
+        "UC-04"
+      ],
+      "acceptance_criteria": [
+        "AC-02",
+        "AC-04",
+        "AC-05",
+        "AC-06"
+      ],
+      "demo": "parcial",
+      "note": "Límite y tope fijos del seed aplicados y probados; cálculo, tope global y ajuste auditado diferidos."
+    },
+    {
+      "scope": "S06",
+      "use_cases": [
+        "UC-02",
+        "UC-19"
+      ],
+      "acceptance_criteria": [
+        "AC-18"
+      ],
+      "demo": "diferido",
+      "note": "Requiere facturación y stock verificados (G05)."
+    },
+    {
+      "scope": "S07",
+      "use_cases": [
+        "UC-04"
+      ],
+      "acceptance_criteria": [
+        "AC-03",
+        "AC-20"
+      ],
+      "demo": "incluido",
+      "note": "Pago por alias desde directorio; QR lo resuelve el front."
+    },
+    {
+      "scope": "S08",
+      "use_cases": [
+        "UC-05"
+      ],
+      "acceptance_criteria": [
+        "AC-03"
+      ],
+      "demo": "parcial",
+      "note": "El cobro se demuestra por alias; QR estático/con monto no se implementa en la API."
+    },
+    {
+      "scope": "S09",
+      "use_cases": [
+        "UC-06"
+      ],
+      "acceptance_criteria": [
+        "AC-22"
+      ],
+      "demo": "parcial",
+      "note": "Búsqueda por alias/nombre; rubros y oferta diferidos."
+    },
+    {
+      "scope": "S10",
+      "use_cases": [
+        "UC-07",
+        "UC-10"
+      ],
+      "acceptance_criteria": [
+        "AC-09",
+        "AC-10",
+        "AC-11"
+      ],
+      "demo": "diferido",
+      "note": "Depende de O2/O6 y de notificaciones."
+    },
+    {
+      "scope": "S11",
+      "use_cases": [
+        "UC-11"
+      ],
+      "acceptance_criteria": [
+        "AC-12"
+      ],
+      "demo": "diferido",
+      "note": "Requiere cuenta de deuda castigada para preservar suma cero."
+    },
+    {
+      "scope": "S12",
+      "use_cases": [
+        "UC-12",
+        "UC-13",
+        "UC-14",
+        "UC-15",
+        "UC-17"
+      ],
+      "acceptance_criteria": [
+        "AC-13",
+        "AC-14",
+        "AC-15",
+        "AC-16",
+        "AC-24"
+      ],
+      "demo": "diferido",
+      "note": "Depende de O3, O4, O8 y G04."
+    },
+    {
+      "scope": "S13",
+      "use_cases": [
+        "UC-15",
+        "UC-16"
+      ],
+      "acceptance_criteria": [
+        "AC-14"
+      ],
+      "demo": "diferido",
+      "note": "Cuota y penalidad fuera del demo; su valor sigue abierto en G03."
+    },
+    {
+      "scope": "S14",
+      "use_cases": [
+        "UC-19"
+      ],
+      "acceptance_criteria": [
+        "AC-25",
+        "AC-26"
+      ],
+      "demo": "diferido",
+      "note": "Consola, roles y auditoría administrativa diferidas."
+    },
+    {
+      "scope": "S15",
+      "use_cases": [
+        "UC-18"
+      ],
+      "acceptance_criteria": [
+        "AC-21"
+      ],
+      "demo": "diferido",
+      "note": "Pausa de emergencia no implementada en el demo."
+    },
+    {
+      "scope": "S16",
+      "use_cases": [
+        "UC-04",
+        "UC-07",
+        "UC-17"
+      ],
+      "acceptance_criteria": [
+        "AC-17",
+        "AC-19",
+        "AC-22",
+        "AC-23",
+        "AC-24"
+      ],
+      "demo": "parcial",
+      "note": "PWA de Oky en curso; vista de inversor diferida; sin acción de canje (AC-17 se cumple por ausencia)."
+    },
+    {
+      "scope": "S17",
+      "use_cases": [
+        "UC-10",
+        "UC-16"
+      ],
+      "acceptance_criteria": [
+        "AC-11"
+      ],
+      "demo": "diferido",
+      "note": "Sin email ni push en el demo; el comercio refresca."
+    },
+    {
+      "scope": "S18",
+      "use_cases": [
+        "UC-20"
+      ],
+      "acceptance_criteria": [
+        "AC-27"
+      ],
+      "demo": "diferido",
+      "note": "Los datos de demo y el indicador de circularidad cubren la verificación mínima; la simulación reproducible queda para la fase 5."
+    }
+  ],
+  "traceability_fixes": {
+    "note": "Correcciones ya aplicadas en la spec funcional aprobada. Se dejan registradas para que no se reintroduzcan como huecos.",
+    "entries": [
+      "S18 ahora traza a AC-27 (simulación reproducible del piloto) y no queda sin criterio de aceptación.",
+      "UC-16 incluye a A08 entre sus actores: el proceso automático emite la cuota de membresía, además del operador que registra el ingreso."
+    ]
+  },
+  "gate": {
+    "implementation_started": true,
+    "implementation_scope": "demo_slice: registro/demo login, saldo, pago, historial, vista de comercio",
+    "functional_spec_approved": true,
+    "technical_spec_approved": false,
+    "todos_approved": false,
+    "full_scope_blocked": true,
+    "full_scope_blocked_reason": "El alcance completo requiere aprobación explícita de esta spec técnica y del plan de tareas, y decisión con Oky sobre O1, O2, O3, O4, G01, G03 y G04.",
+    "demo_slice_blocked_by": [],
+    "pending_decisions_with_oky": [
+      "O1",
+      "O2",
+      "O3",
+      "O4",
+      "G01",
+      "G03",
+      "G04"
+    ],
+    "next_step": "Revisar y aprobar docs/technical-spec.json y docs/todos.json; integrar la PWA de Oky contra el backend ya implementado; decidir O1-O4, G01, G03 y G04 antes del alcance completo.",
+    "demo_slice_backend_status": "implemented_tested"
+  }
+}
