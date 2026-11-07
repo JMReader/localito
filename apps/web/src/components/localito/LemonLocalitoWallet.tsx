@@ -12,6 +12,7 @@ import {
   Eye,
   EyeOff,
   QrCode,
+  Search,
   Send,
   SlidersHorizontal,
   X,
@@ -1062,6 +1063,16 @@ function PayView({
   const [step, setStep] = useState<"who" | "amount">(
     recipient ? "amount" : "who"
   );
+  const [query, setQuery] = useState("");
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? recipients.filter(
+        (p) =>
+          p.alias.toLowerCase().includes(q) ||
+          p.display_name.toLowerCase().includes(q)
+      )
+    : recipients;
 
   const pick = (p: Participant) => {
     onSelectRecipient(p);
@@ -1072,7 +1083,7 @@ function PayView({
     <div className="absolute inset-0 z-30 bg-[#0E1014] flex flex-col">
       <header className="px-5 pt-5 pb-1 flex items-center justify-between">
         <span className="text-sm font-bold text-white">
-          {step === "who" ? "¿A quién le pagás?" : "Pagar en TL"}
+          {step === "who" ? "¿A quién le transferís?" : "Pagar en TL"}
         </span>
         <button
           type="button"
@@ -1090,12 +1101,29 @@ function PayView({
         </p>
       ) : step === "who" ? (
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+          <div className="relative pb-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+            <input
+              type="text"
+              inputMode="search"
+              autoComplete="off"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Alias, CBU o CVU"
+              className="w-full h-12 rounded-full bg-[#15181F] border border-white/10 pl-11 pr-4 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#00DF1A]/60"
+            />
+          </div>
           {recipients.length === 0 && (
             <p className="text-xs text-zinc-500 font-mono py-10 text-center">
               Cargando contactos…
             </p>
           )}
-          {recipients.map((p) => (
+          {recipients.length > 0 && filtered.length === 0 && (
+            <p className="text-xs text-zinc-500 font-mono py-10 text-center">
+              Sin resultados para “{query}”.
+            </p>
+          )}
+          {filtered.map((p) => (
             <button
               key={p.id}
               type="button"
