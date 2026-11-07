@@ -12,9 +12,9 @@
       "path": "docs/functional-spec.json",
       "version": "0.1.0",
       "status": "approved",
-      "sha256": "88020ABAC44B7CB24DF283F0320B9811C1F0DC2AE4036158D6B95E4D1FCD74A4",
+      "sha256": "175106CA732BCD43A38F811D3336E832DB008F470BE90D634CFD06FA933187EE",
       "hash_algorithm": "sha256",
-      "note": "Hash calculado sobre la copia del repo al 2026-11-07. Si el archivo cambia, este hash deja de ser válido."
+      "note": "Hash recalculado sobre docs/functional-spec.json al 2026-11-07. Si el archivo cambia, este hash deja de ser válido."
     },
     "hitl_disclaimer": "Este documento es borrador técnico. No se aprueba solo: requiere aprobación explícita del usuario antes de habilitar el alcance completo.",
     "approval": {
@@ -122,15 +122,15 @@
         "id": "C03",
         "name": "Persistencia SQLite",
         "owner": "backend",
-        "responsibility": "Archivo services/api/data/localito.db en desarrollo; :memory: en tests. Esquema creado al arrancar.",
-        "boundaries": "Acceso sólo a través de repositorios. El archivo de datos está ignorado por git."
+        "responsibility": "Archivo services/api/data/localito.db en desarrollo; :memory: en tests. Esquema, migraciones, pragmas y seed viven en src/db.ts y se aplican al arrancar.",
+        "boundaries": "Acceso sólo desde src/db.ts y src/ledger.ts. El archivo de datos está ignorado por git."
       },
       {
         "id": "C04",
-        "name": "LedgerPort (interfaz de libro mayor)",
+        "name": "Contrato interno del libro mayor (src/ledger.ts)",
         "owner": "backend",
-        "responsibility": "Contrato interno para leer saldos y aplicar transferencias atómicas. Implementación actual: SqliteLedger.",
-        "boundaries": "Permite sustituir la implementación por un adaptador onchain en el futuro sin cambiar rutas ni contrato HTTP."
+        "responsibility": "Funciones pay(), listTransactions(), getTransactionForParticipant() y getStats() sobre SQLite atómico. No existe una interfaz TypeScript separada en el demo.",
+        "boundaries": "Permite reemplazar src/ledger.ts por un adaptador onchain en el futuro sin cambiar rutas ni contrato HTTP."
       },
       {
         "id": "C05",
@@ -152,8 +152,8 @@
         "2. El usuario elige destinatario por alias o desde GET /participants.",
         "3. El front envía POST /payments con amount_cents, note e Idempotency-Key.",
         "4. La API autentica el token, valida el body con zod y abre una transacción SQLite.",
-        "5. LedgerPort verifica estado de ambos participantes, límite del emisor y tope del receptor.",
-        "6. LedgerPort aplica el débito y el crédito, inserta la transacción y los dos asientos, y confirma el commit.",
+        "5. src/ledger.ts verifica estado de ambos participantes, límite del emisor y tope del receptor.",
+        "6. src/ledger.ts inserta la transacción, actualiza ambos saldos y escribe los dos asientos con kind payment_out/payment_in, y confirma el commit.",
         "7. La API responde 201 con la transacción, los saldos resultantes e idempotent_replay.",
         "8. El front refresca GET /me y GET /transactions; el comercio ve el cobro al refrescar."
       ],
@@ -172,41 +172,42 @@
         "services/api/ (backend del demo)"
       ],
       "services_api": [
-        "package.json, tsconfig.json, vitest.config.ts",
+        "package.json, tsconfig.json",
         "src/server.ts (arranque Fastify)",
-        "src/routes/ (health, auth, participants, payments, transactions, stats, demo)",
-        "src/domain/ (ledger, payments, errors, schemas zod)",
-        "src/repo/ (participants, transactions, sessions; SqliteLedger)",
-        "src/plugins/ (auth, error-handler, cors)",
-        "test/ (unit, integration, contract)",
+        "src/app.ts (rutas HTTP, validación zod, auth Bearer y CORS)",
+        "src/db.ts (esquema SQLite, migraciones, pragmas, seed y sesiones)",
+        "src/ledger.ts (pagos atómicos, historial, detalle y stats)",
+        "src/errors.ts (ApiError)",
+        "test/api.test.ts (contrato, invariantes, sesiones, seed y migraciones)",
         "data/ (localito.db, ignorado por git)"
       ],
       "notes": [
         "No se toca apps/web desde el backend.",
-        "No se agrega carpeta contracts/ ni generación de tipos en el demo: el contrato es markdown y los tests validan la forma."
+        "No se agrega carpeta contracts/ ni generación de tipos en el demo: el contrato es markdown y los tests validan la forma.",
+        "La implementación usa archivos planos en src/ y un único archivo de tests; no hay subcarpetas routes/, domain/, repo/ ni plugins/."
       ]
     },
     "ledger_interface": {
-      "purpose": "Aislar la contabilidad del transporte HTTP y dejar preparado el reemplazo por una implementación onchain.",
+      "purpose": "Documentar el contrato interno que implementa src/ledger.ts y aislar la contabilidad del transporte HTTP. La implementación real son funciones exportadas, no una interfaz TypeScript.",
       "operations": [
         {
-          "name": "get_participant",
+          "name": "find_participant",
           "input": "participant_id",
           "output": "saldo, límite de crédito, tope positivo, estado"
         },
         {
-          "name": "apply_payment",
+          "name": "pay",
           "input": "from_id, to_id, amount_cents, note, idempotency_key, now",
           "output": "transaction_id, balance_after_cents, counterparty_balance_after_cents",
           "guarantees": "Atómico, idempotente por clave, rechaza si viola cualquier invariante."
         },
         {
-          "name": "list_entries",
+          "name": "list_transactions",
           "input": "participant_id, limit",
           "output": "movimientos ordenados por fecha descendente"
         },
         {
-          "name": "circuit_totals",
+          "name": "get_stats",
           "output": "participant_count, transaction_count, total_volume_cents, sum_balances_cents"
         }
       ],
@@ -214,9 +215,15 @@
         "status": "DIFERIDO",
         "description": "Un OnchainLedgerAdapter implementaría las mismas operaciones sobre contratos en Avalanche y el fondo en USDC. Requiere decisiones O4, G04 y O8, y no forma parte del MVP demostrable.",
         "unchanged": "Rutas, DTOs y contrato HTTP no cambian si se sustituye la implementación."
-      }
+      },
+      "implementation": "src/ledger.ts (pagos, historial, detalle, stats) y src/db.ts (participantes y sesiones)."
     },
-    "no_smart_contracts_now": "El demo no despliega contratos, no usa wallets ni RPC. Toda la contabilidad es SQLite con asientos append-only. La arquitectura onchain del documento fuente queda como intención futura detrás de LedgerPort."
+    "no_smart_contracts_now": "El demo no despliega contratos, no usa wallets ni RPC. Toda la contabilidad es SQLite con asientos append-only. La arquitectura onchain del documento fuente queda como intención futura detrás de LedgerPort.",
+    "implementation_notes": [
+      "Implementación real en archivos planos: src/app.ts (rutas + zod), src/db.ts (esquema, migraciones, seed y sesiones), src/ledger.ts (pagos, historial, stats), src/errors.ts y src/server.ts.",
+      "Las bases existentes se migran al arrancar: sessions(token) se convierte a token_hash + expires_at y ledger_entries recibe kind. Los CHECK nuevos aplican al esquema fresco; participants y transactions existentes no se reconstruyen para no arriesgar datos.",
+      "PRAGMA foreign_keys = ON, busy_timeout = 5000 y journal_mode = WAL en archivo. El seed corre en una transacción y hace upsert por alias."
+    ]
   },
   "domain_model": {
     "entities": [
@@ -495,7 +502,7 @@
           "INDEX idx_ledger_participant ON ledger_entries(participant_id, id DESC)",
           "INDEX idx_ledger_transaction ON ledger_entries(transaction_id)"
         ],
-        "notes": "Append-only. Los saldos de participants son la vista materializada del último asiento; los tests verifican que coincidan."
+        "notes": "Append-only. Cada pago genera exactamente dos asientos de signo opuesto con kind payment_out/payment_in. CHECK de delta distinto de cero y coherencia kind/delta; los saldos de participants son la vista materializada del último asiento y los tests verifican que coincidan."
       },
       {
         "name": "sessions",
@@ -524,7 +531,7 @@
         "indexes": [
           "INDEX idx_sessions_participant ON sessions(participant_id)"
         ],
-        "notes": "Se guarda el sha256 del token, no el token en claro. TTL de demo: 24 horas, configurable."
+        "notes": "Se guarda el sha256 del token, no el token en claro. TTL fijo de 24 horas para el demo (SESSION_TTL_MS); auth rechaza expires_at vencido. Las sesiones en claro de una DB previa se migran hasheadas sin perderlas."
       }
     ],
     "deferred_tables": [
@@ -598,7 +605,7 @@
         "method": "POST",
         "path": "/auth/demo",
         "auth": false,
-        "purpose": "Login de demo por alias; crea sesión y devuelve token + participante.",
+        "purpose": "Login de demo por alias; crea sesión con sha256(token) y vencimiento a 24 h, y devuelve el token crudo + participante.",
         "success": 200,
         "errors": [
           "NOT_FOUND"
@@ -618,7 +625,7 @@
         "method": "GET",
         "path": "/participants",
         "auth": true,
-        "purpose": "Listado o búsqueda por alias/nombre, máximo 20.",
+        "purpose": "Listado o búsqueda literal por alias/nombre (comodines escapados), máximo 20.",
         "success": 200,
         "errors": [
           "UNAUTHORIZED"
@@ -628,7 +635,7 @@
         "method": "POST",
         "path": "/payments",
         "auth": true,
-        "purpose": "Pago entre participantes con Idempotency-Key opcional.",
+        "purpose": "Pago entre participantes; `to` es alias (no id), note hasta 280 e Idempotency-Key hasta 120.",
         "success": 201,
         "errors": [
           "VALIDATION_ERROR",
@@ -655,7 +662,7 @@
         "method": "GET",
         "path": "/transactions/:id",
         "auth": true,
-        "purpose": "Detalle/recibo si el usuario participó; 404 si no existe o no participó.",
+        "purpose": "Detalle/recibo si el usuario participó; 404 si no existe o no participó. Los saldos son relativos al usuario autenticado.",
         "success": 200,
         "errors": [
           "UNAUTHORIZED",
@@ -692,13 +699,13 @@
         {
           "code": "VALIDATION_ERROR",
           "http": 422,
-          "when": "body inválido, monto <= 0, alias faltante",
+          "when": "body inválido, monto <= 0, alias faltante, nota > 280 o Idempotency-Key > 120",
           "details": "issues"
         },
         {
           "code": "UNAUTHORIZED",
           "http": 401,
-          "when": "token ausente o inválido",
+          "when": "token ausente, inválido o vencido",
           "details": null
         },
         {
@@ -749,7 +756,9 @@
       "Los montos viajan como enteros en centavos (amount_cents, balance_cents, available_cents).",
       "GET /transactions devuelve sólo movimientos del autenticado; nunca datos de terceros.",
       "Sin websockets ni push en v0: el comercio refresca.",
-      "CORS: orígenes locales permitidos con DEMO_MODE=true; lista explícita en CORS_ORIGINS fuera de demo."
+      "CORS: orígenes locales permitidos con DEMO_MODE=true; lista explícita en CORS_ORIGINS fuera de demo.",
+      "POST /demo/reset exige Bearer además de DEMO_MODE=true; sin sesión responde 401 y no borra nada.",
+      "GET /transactions/:id expone balance_after_cents del usuario autenticado y counterparty_balance_after_cents de la contraparte."
     ]
   },
   "decisions": {
@@ -954,19 +963,19 @@
         "level": "unit",
         "tool": "vitest",
         "scope": "Dominio puro: cálculo de available_cents y receive_capacity_cents, validaciones de monto, límite y tope, comparación de bodies para idempotencia, mapeo de errores.",
-        "notes": "Sin base de datos; funciones deterministas."
+        "notes": "En el demo estas comprobaciones viven en test/api.test.ts junto a las de integración; no hay carpeta test/unit."
       },
       {
         "level": "integration",
         "tool": "vitest + app.inject() de Fastify",
         "scope": "Cada endpoint contra SQLite :memory: con seed; incluye auth, 404, validaciones y códigos HTTP.",
-        "notes": "Un archivo por área: auth, participants, payments, transactions, stats, demo."
+        "notes": "Suite única en test/api.test.ts con SQLite :memory: y app.inject(); no hay un archivo por área ni subcarpetas."
       },
       {
         "level": "contract",
         "tool": "vitest",
         "scope": "Forma exacta de las respuestas y del objeto error según docs/api-contract.md: campos, tipos, nombres y códigos.",
-        "notes": "Falla si se agrega o renombra un campo sin actualizar el contrato y avisar a Oky."
+        "notes": "Bloque \"contrato estricto\" dentro de test/api.test.ts; falla si se agrega o renombra un campo sin actualizar el contrato."
       },
       {
         "level": "e2e_manual",
@@ -986,23 +995,29 @@
       "Dos reintentos con la misma clave producen una sola transacción y una sola pareja de asientos.",
       "Misma clave con body distinto devuelve 409 y no altera saldos.",
       "Pago a sí mismo se rechaza sin efectos.",
-      "Pago con monto 0 o negativo se rechaza en validación."
+      "Pago con monto 0 o negativo se rechaza en validación.",
+      "Un fallo al escribir el segundo asiento revierte transacción, saldos y asientos (rollback completo).",
+      "Reabrir la base no duplica el seed y repara participantes faltantes por alias.",
+      "Una DB previa migra sessions.token a token_hash + expires_at y agrega kind a ledger_entries sin perder sesiones ni asientos.",
+      "PRAGMA busy_timeout = 5000 y foreign_keys = ON quedan activos al abrir la base."
     ],
     "contract_tests": [
       "GET /health: status, service, version, time.",
-      "POST /auth/demo: token string y participante con los 9 campos del contrato.",
+      "POST /auth/demo: token string y participante con los 9 campos del contrato; el token crudo no se guarda en sessions.",
       "GET /me: mismos campos que el participante del login.",
       "GET /participants: array participants con máximo 20 y filtro por q.",
       "POST /payments 201: transaction con from/to anidados, currency localito, balance_after_cents e idempotent_replay booleano.",
       "Errores: objeto único { error: { code, message, details } } para cada código documentado.",
       "GET /transactions: direction in/out y counterparty con alias y display_name.",
-      "GET /transactions/:id: 404 cuando el usuario no participó.",
+      "GET /transactions/:id: 404 cuando el usuario no participó y saldos relativos al viewer cuando sí.",
       "GET /stats: zero_sum_ok booleano y suma de balances.",
-      "POST /demo/reset: 200 con { reset: true } y rechazo si DEMO_MODE=false."
+      "POST /demo/reset: 401 sin Bearer, 200 con { reset: true } y 404 si DEMO_MODE=false.",
+      "Idempotency-Key > 120 y note > 280: 422 VALIDATION_ERROR sin efectos.",
+      "Búsqueda q con % o _: se trata como texto literal y no como comodín."
     ],
     "manual_demo_script": [
       "1. Arrancar API en :3001 y PWA en :3000.",
-      "2. Ejecutar /demo/reset para estado limpio.",
+      "2. Ejecutar /demo/reset autenticado para estado limpio.",
       "3. Entrar como ana; verificar saldo 0, límite 50.000 y disponible 50.000 (en unidades mostradas).",
       "4. Buscar kiosco en el directorio y abrir el pago.",
       "5. Pagar 1.500 con nota 'Compra de demo'.",
@@ -1016,7 +1031,8 @@
       "Todos los tests de integración y de invariantes en verde antes de la demo.",
       "Cero usos de as any, ts-ignore o supresión de tipos.",
       "Contrato validado con tests; cualquier cambio avisado a Oky.",
-      "Revisión manual del guion de demo completo al menos una vez."
+      "Revisión manual del guion de demo completo al menos una vez.",
+      "npm run typecheck, npm test y npm run build en verde en services/api."
     ]
   },
   "risks": [

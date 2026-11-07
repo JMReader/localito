@@ -231,11 +231,11 @@
         "services/api/package.json",
         "services/api/tsconfig.json",
         "services/api/src/server.ts",
-        "services/api/src/routes/health.ts"
+        "services/api/src/app.ts"
       ],
       "blockers": [],
       "estimate": "M",
-      "progress_note": "Al 2026-11-07 existe estructura inicial sin commit (package.json, tsconfig.json, src/db.ts, src/errors.ts, src/ledger.ts); falta verificar arranque y GET /health."
+      "progress_note": "Implementado al 2026-11-07 en archivos planos (src/server.ts, src/app.ts, src/db.ts, src/ledger.ts, src/errors.ts); typecheck, 38 tests y build verificados."
     },
     {
       "id": "T05",
@@ -250,9 +250,7 @@
       "parallel_group": "g1-backend",
       "acceptance": "El esquema se crea sin errores en archivo y en :memory:; reiniciar no duplica tablas ni datos; las FK están activas.",
       "files_areas": [
-        "services/api/src/repo/schema.ts",
-        "services/api/src/repo/db.ts",
-        "services/api/data/.gitignore"
+        "services/api/src/db.ts"
       ],
       "blockers": [],
       "estimate": "M"
@@ -270,7 +268,7 @@
       "parallel_group": "g1-backend",
       "acceptance": "Tras arrancar, GET /api/participants devuelve los 5 participantes con los valores del contrato; reiniciar no duplica.",
       "files_areas": [
-        "services/api/src/repo/seed.ts"
+        "services/api/src/db.ts"
       ],
       "blockers": [],
       "estimate": "S"
@@ -288,12 +286,11 @@
       "parallel_group": "g1-backend",
       "acceptance": "apply_payment mueve exactamente dos saldos y escribe dos asientos o no hace nada; los tests de unidad cubren límite, tope, autopago y monto inválido.",
       "files_areas": [
-        "services/api/src/domain/ledger.ts",
-        "services/api/src/repo/sqlite-ledger.ts"
+        "services/api/src/ledger.ts"
       ],
       "blockers": [],
       "estimate": "L",
-      "progress_note": "Diseñado en la spec técnica y con archivo src/ledger.ts sin commit al 2026-11-07; falta la implementación SQLite, la atomicidad y los tests de invariantes."
+      "progress_note": "Implementado en src/ledger.ts sobre node:sqlite, con BEGIN IMMEDIATE y dos asientos por pago; cubierto por tests de atomicidad, rollback e invariantes."
     },
     {
       "id": "T08",
@@ -306,10 +303,10 @@
         "T05"
       ],
       "parallel_group": "g1-backend",
-      "acceptance": "ana obtiene token y participante; /me con token devuelve lo mismo; alias inexistente da 404 NOT_FOUND; token inválido da 401.",
+      "acceptance": "ana obtiene token y participante; /me con token devuelve lo mismo; la base guarda sha256(token) y expires_at a 24 h; un token vencido da 401; alias inexistente da 404 NOT_FOUND; token inválido da 401.",
       "files_areas": [
-        "services/api/src/routes/auth.ts",
-        "services/api/src/repo/sessions.ts"
+        "services/api/src/app.ts",
+        "services/api/src/db.ts"
       ],
       "blockers": [
         "O7",
@@ -330,9 +327,8 @@
       "parallel_group": "g1-backend",
       "acceptance": "Rutas protegidas sin token dan 401; cualquier error de dominio devuelve la forma única con el código del contrato.",
       "files_areas": [
-        "services/api/src/plugins/auth.ts",
-        "services/api/src/plugins/error-handler.ts",
-        "services/api/src/domain/errors.ts"
+        "services/api/src/app.ts",
+        "services/api/src/errors.ts"
       ],
       "blockers": [],
       "estimate": "S"
@@ -351,8 +347,8 @@
       "parallel_group": "g1-backend",
       "acceptance": "Sin q devuelve hasta 20; con q='kios' devuelve kiosco; con q sin resultados devuelve lista vacía; nunca expone datos fuera del contrato.",
       "files_areas": [
-        "services/api/src/routes/participants.ts",
-        "services/api/src/repo/participants.ts"
+        "services/api/src/app.ts",
+        "services/api/src/db.ts"
       ],
       "blockers": [],
       "estimate": "S"
@@ -372,9 +368,8 @@
       "parallel_group": "g1-backend",
       "acceptance": "Caso feliz devuelve 201 con transaction y saldos; exceso de límite da INSUFFICIENT_CREDIT con shortfall; tope del receptor da RECEIVER_LIMIT; autopago SELF_PAYMENT; monto <= 0 VALIDATION_ERROR.",
       "files_areas": [
-        "services/api/src/routes/payments.ts",
-        "services/api/src/domain/payments.ts",
-        "services/api/src/domain/schemas.ts"
+        "services/api/src/app.ts",
+        "services/api/src/ledger.ts"
       ],
       "blockers": [],
       "estimate": "L"
@@ -383,17 +378,17 @@
       "id": "T12",
       "phase": "P1",
       "title": "Idempotencia de pagos",
-      "description": "Soporte de Idempotency-Key por emisor: replay con la misma transacción, conflicto si el body difiere y sin efectos en saldos.",
+      "description": "Soporte de Idempotency-Key por emisor (máximo 120 caracteres): replay con la misma transacción, conflicto si el body difiere, sin efectos en saldos y sin 500 si otra conexión gana la carrera de clave duplicada.",
       "owner": "backend",
       "status": "done",
       "depends_on": [
         "T11"
       ],
       "parallel_group": "g1-backend",
-      "acceptance": "Dos POST con la misma clave devuelven una sola transacción y una sola pareja de asientos; la segunda respuesta trae idempotent_replay=true; body distinto da 409 IDEMPOTENCY_CONFLICT.",
+      "acceptance": "Dos POST con la misma clave devuelven una sola transacción y una sola pareja de asientos; la segunda respuesta trae idempotent_replay=true; body distinto da 409 IDEMPOTENCY_CONFLICT; clave mayor a 120 caracteres da 422 VALIDATION_ERROR.",
       "files_areas": [
-        "services/api/src/domain/idempotency.ts",
-        "services/api/src/routes/payments.ts"
+        "services/api/src/ledger.ts",
+        "services/api/src/app.ts"
       ],
       "blockers": [],
       "estimate": "M"
@@ -410,10 +405,10 @@
         "T09"
       ],
       "parallel_group": "g1-backend",
-      "acceptance": "ana ve dirección out y kiosco in del mismo pago; limit respeta el máximo 100; un tercero recibe 404 en el detalle.",
+      "acceptance": "ana ve dirección out y kiosco in del mismo pago; limit respeta el máximo 100; un tercero recibe 404 en el detalle; GET /transactions/:id devuelve balance_after_cents relativo al usuario autenticado y counterparty_balance_after_cents relativo a la contraparte.",
       "files_areas": [
-        "services/api/src/routes/transactions.ts",
-        "services/api/src/repo/transactions.ts"
+        "services/api/src/app.ts",
+        "services/api/src/db.ts"
       ],
       "blockers": [],
       "estimate": "M"
@@ -431,8 +426,8 @@
       "parallel_group": "g1-backend",
       "acceptance": "Con seed y un pago, zero_sum_ok es true y sum_balances_cents es 0; los contadores coinciden con la base.",
       "files_areas": [
-        "services/api/src/routes/stats.ts",
-        "services/api/src/repo/sqlite-ledger.ts"
+        "services/api/src/app.ts",
+        "services/api/src/ledger.ts"
       ],
       "blockers": [],
       "estimate": "S"
@@ -441,7 +436,7 @@
       "id": "T15",
       "phase": "P1",
       "title": "POST /demo/reset protegido",
-      "description": "Reset de demo con body {confirm:'reset'}, borrado de movimientos y sesiones y saldos en 0; sólo si DEMO_MODE=true.",
+      "description": "Reset de demo con body {confirm:'reset'} y Bearer obligatorio; borrado de movimientos y sesiones y saldos en 0; sólo si DEMO_MODE=true.",
       "owner": "backend",
       "status": "done",
       "depends_on": [
@@ -449,9 +444,9 @@
         "T09"
       ],
       "parallel_group": "g1-backend",
-      "acceptance": "Con DEMO_MODE=true devuelve {reset:true} y deja el seed intacto; con DEMO_MODE=false la ruta no existe o responde 404; confirm distinto no borra nada.",
+      "acceptance": "Sin Bearer responde 401 y no borra nada; con Bearer y DEMO_MODE=true devuelve {reset:true} y deja el seed intacto; con DEMO_MODE=false responde 404 aun con sesión válida; confirm distinto no borra nada.",
       "files_areas": [
-        "services/api/src/routes/demo.ts"
+        "services/api/src/app.ts"
       ],
       "blockers": [],
       "estimate": "S"
@@ -460,7 +455,7 @@
       "id": "T16",
       "phase": "P1",
       "title": "Tests de contrato de las respuestas",
-      "description": "Tests que fallan si la forma de las respuestas o del objeto error se aparta de docs/api-contract.md.",
+      "description": "Tests de contrato estrictos en services/api/test/api.test.ts: fallan si la forma de las respuestas o del objeto error se aparta de docs/api-contract.md.",
       "owner": "qa",
       "status": "done",
       "depends_on": [
@@ -471,7 +466,7 @@
       "parallel_group": "g1-contract",
       "acceptance": "Cada endpoint del contrato tiene al menos un test de forma; los códigos de error se validan uno por uno.",
       "files_areas": [
-        "services/api/test/contract/"
+        "services/api/test/api.test.ts"
       ],
       "blockers": [],
       "estimate": "M"
@@ -480,7 +475,7 @@
       "id": "T17",
       "phase": "P1",
       "title": "Tests de invariantes del ledger",
-      "description": "Suma cero, coincidencia saldo/asiento, límite exacto, rechazos sin efectos y atomicidad ante fallos.",
+      "description": "Tests de invariantes del ledger en services/api/test/api.test.ts: suma cero de saldos y deltas, coincidencia saldo/asiento, límite exacto, rechazos sin efectos, rollback y pagos múltiples.",
       "owner": "qa",
       "status": "done",
       "depends_on": [
@@ -490,8 +485,7 @@
       "parallel_group": "g1-contract",
       "acceptance": "La batería de invariantes del technical spec pasa en verde y cubre al menos 10 escenarios.",
       "files_areas": [
-        "services/api/test/unit/",
-        "services/api/test/integration/payments.test.ts"
+        "services/api/test/api.test.ts"
       ],
       "blockers": [],
       "estimate": "M"
@@ -715,7 +709,7 @@
       "parallel_group": "g4-qa",
       "acceptance": "Cada criterio tiene un caso ejecutado y su resultado registrado; ninguno queda en duda.",
       "files_areas": [
-        "services/api/test/",
+        "services/api/test/api.test.ts",
         "docs/"
       ],
       "blockers": [],
@@ -736,7 +730,7 @@
       "parallel_group": "g4-qa",
       "acceptance": "Tras N pagos, sum_balances_cents = 0; tras reset, todos los saldos en 0 y sin sesiones activas.",
       "files_areas": [
-        "services/api/test/"
+        "services/api/test/api.test.ts"
       ],
       "blockers": [],
       "estimate": "S"
@@ -755,8 +749,7 @@
       "parallel_group": "g4-qa",
       "acceptance": "Con DEMO_MODE=false no hay reset ni CORS abierto; no hay tokens ni secretos en logs ni en el repo.",
       "files_areas": [
-        "services/api/src/plugins/",
-        "services/api/.env.example",
+        "services/api/src/app.ts",
         ".gitignore"
       ],
       "blockers": [
@@ -1095,6 +1088,6 @@
       "T31",
       "T32"
     ],
-    "note": "Backend T04-T17 implementado y verificado (20 tests, typecheck y build). El camino crítico pasa por la PWA de Oky y la integración."
+    "note": "Backend T04-T17 implementado y verificado (38 tests, typecheck y build). El camino crítico pasa por la PWA de Oky y la integración."
   }
 }

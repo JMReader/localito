@@ -6,6 +6,9 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import {
+  MAX_ALIAS_LENGTH,
+  MAX_IDEMPOTENCY_KEY_LENGTH,
+  MAX_NOTE_LENGTH,
   createDb,
   createSession,
   findParticipantByAlias,
@@ -34,7 +37,11 @@ export type CreateAppOptions = {
 };
 
 const LoginSchema = z.object({
-  alias: z.string().trim().min(1, 'Indicá un alias de demo.'),
+  alias: z
+    .string()
+    .trim()
+    .min(1, 'Indicá un alias de demo.')
+    .max(MAX_ALIAS_LENGTH, `El alias no puede superar los ${MAX_ALIAS_LENGTH} caracteres.`),
 });
 
 const SearchSchema = z.object({
@@ -42,9 +49,17 @@ const SearchSchema = z.object({
 });
 
 const PaymentSchema = z.object({
-  to: z.string().trim().min(1, 'Indicá a quién le pagás.'),
+  to: z
+    .string()
+    .trim()
+    .min(1, 'Indicá a quién le pagás.')
+    .max(MAX_ALIAS_LENGTH, `El alias no puede superar los ${MAX_ALIAS_LENGTH} caracteres.`),
   amount_cents: z.number().int().positive('El monto debe ser mayor a cero.'),
-  note: z.string().trim().max(280, 'La nota no puede superar los 280 caracteres.').nullish(),
+  note: z
+    .string()
+    .trim()
+    .max(MAX_NOTE_LENGTH, `La nota no puede superar los ${MAX_NOTE_LENGTH} caracteres.`)
+    .nullish(),
 });
 
 const ListSchema = z.object({
@@ -76,7 +91,19 @@ function readIdempotencyKey(request: FastifyRequest): string | null {
   const raw = request.headers['idempotency-key'];
   const value = Array.isArray(raw) ? raw[0] : raw;
   const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
+  if (!trimmed) return null;
+  if (trimmed.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
+    throw new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      `La clave de idempotencia no puede superar los ${MAX_IDEMPOTENCY_KEY_LENGTH} caracteres.`,
+    );
+  }
+  return trimmed;
+}
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
 function requireParticipant(db: DatabaseSync, request: FastifyRequest): ParticipantRow {
@@ -191,9 +218,9 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     const rows = q
       ? (db
           .prepare(
-            'SELECT * FROM participants WHERE alias LIKE ? OR display_name LIKE ? ORDER BY alias LIMIT 20',
+            "SELECT * FROM participants WHERE alias LIKE ? ESCAPE '\\' OR display_name LIKE ? ESCAPE '\\' ORDER BY alias LIMIT 20",
           )
-          .all(`%${q}%`, `%${q}%`) as ParticipantRow[])
+          .all(`%${escapeLike(q)}%`, `%${escapeLike(q)}%`) as ParticipantRow[])
       : (db.prepare('SELECT * FROM participants ORDER BY alias LIMIT 20').all() as ParticipantRow[]);
 
     return { participants: rows.map(participantView) };
@@ -243,6 +270,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     if (!demoMode) {
       throw new ApiError(404, 'NOT_FOUND', 'El reset de demo no está disponible.');
     }
+    requireParticipant(db, request);
     parseInput(ResetSchema, request.body);
     resetDemo(db);
     return { reset: true };
