@@ -1,0 +1,29 @@
+{
+  "name": "Localito — moneda local",
+  "short_name": "Localito",
+  "description": "Billetera de demo para la moneda local del barrio: saldo, pagos e historial.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3ecdd",
+  "theme_color": "#0d5c46",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "categories": ["finance", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
