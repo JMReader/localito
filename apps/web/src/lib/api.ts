@@ -1,5 +1,5 @@
 const API =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+  process.env.NEXT_PUBLIC_API_URL ?? (typeof window !== "undefined" && window.location.hostname.includes("vercel.app") ? "https://localito-backend.vercel.app/api" : "http://localhost:3001/api");
 
 export interface Participant {
   id: string;

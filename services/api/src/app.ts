@@ -194,6 +194,21 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Recurso no encontrado.' } }),
   );
 
+  app.get('/', async () => ({
+    name: 'localito-api',
+    status: 'ok',
+    version: '0.1.0',
+    endpoints: [
+      '/api/health',
+      '/api/auth/demo',
+      '/api/me',
+      '/api/participants',
+      '/api/payments',
+      '/api/transactions',
+      '/api/stats',
+    ],
+  }));
+
   app.get('/api/health', async () => ({
     status: 'ok',
     service: 'localito-api',
@@ -279,4 +294,20 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   });
 
   return app;
+}
+
+let defaultAppPromise: Promise<FastifyInstance> | null = null;
+
+export default async function handler(req: any, res: any) {
+  if (!defaultAppPromise) {
+    defaultAppPromise = createApp({
+      logger: false,
+      dbPath: process.env.DATABASE_PATH ?? ':memory:',
+      demoMode: true,
+      corsOrigins: ['*'],
+    });
+  }
+  const app = await defaultAppPromise;
+  await app.ready();
+  app.server.emit('request', req, res);
 }
