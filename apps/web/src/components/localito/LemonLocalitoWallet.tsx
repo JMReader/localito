@@ -1030,6 +1030,169 @@ interface CuitScoreProfile {
 }
 
 /* ============================================================================
+   VISTA PAGAR — full screen, 2 pasos: elegir alias -> monto + slide
+   ============================================================================ */
+function PayView({
+  recipients,
+  recipient,
+  onSelectRecipient,
+  amountInput,
+  onKeyPress,
+  sending,
+  sendError,
+  availableCents,
+  isReal,
+  coinSymbol,
+  onConfirm,
+  onClose,
+}: {
+  recipients: Participant[];
+  recipient: Participant | null;
+  onSelectRecipient: (p: Participant) => void;
+  amountInput: string;
+  onKeyPress: (k: string) => void;
+  sending: boolean;
+  sendError: string | null;
+  availableCents: number;
+  isReal: boolean;
+  coinSymbol: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const [step, setStep] = useState<"who" | "amount">(
+    recipient ? "amount" : "who"
+  );
+
+  const pick = (p: Participant) => {
+    onSelectRecipient(p);
+    setStep("amount");
+  };
+
+  return (
+    <div className="absolute inset-0 z-30 bg-[#0E1014] flex flex-col">
+      <header className="px-5 pt-5 pb-1 flex items-center justify-between">
+        <span className="text-sm font-bold text-white">
+          {step === "who" ? "¿A quién le pagás?" : "Pagar en TL"}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-zinc-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </header>
+
+      {!isReal ? (
+        <p className="flex-1 flex items-center justify-center text-center text-sm text-zinc-400 px-8">
+          {coinSymbol} no está disponible en esta demo. Elegí TL para pagar.
+        </p>
+      ) : step === "who" ? (
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+          {recipients.length === 0 && (
+            <p className="text-xs text-zinc-500 font-mono py-10 text-center">
+              Cargando contactos…
+            </p>
+          )}
+          {recipients.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => pick(p)}
+              className="w-full h-16 rounded-2xl bg-[#15181F] border border-white/5 hover:bg-[#191C24] hover:border-white/15 flex items-center gap-3 px-4 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+            >
+              <span className="w-10 h-10 rounded-full bg-[#1A1D24] border border-white/10 flex items-center justify-center font-mono text-xs font-bold text-[#00DF1A] shrink-0">
+                {p.alias.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="flex-1 text-left min-w-0">
+                <span className="block text-sm font-semibold text-white truncate">
+                  {p.display_name}
+                </span>
+                <span className="block text-[11px] font-mono text-zinc-500">
+                  ${p.alias}
+                </span>
+              </span>
+              <ChevronRight className="w-4 h-4 text-zinc-500 shrink-0" />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-5 flex flex-col">
+          {recipient && (
+            <button
+              type="button"
+              onClick={() => setStep("who")}
+              className="w-full h-14 rounded-2xl bg-[#15181F] border border-white/5 flex items-center gap-3 px-4 mt-2 cursor-pointer"
+            >
+              <span className="w-9 h-9 rounded-full bg-[#00DF1A]/15 flex items-center justify-center font-mono text-[11px] font-bold text-[#00DF1A] shrink-0">
+                {recipient.alias.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="flex-1 text-left min-w-0">
+                <span className="block text-sm font-semibold text-white truncate">
+                  {recipient.display_name}
+                </span>
+                <span className="block text-[11px] font-mono text-zinc-500">
+                  ${recipient.alias}
+                </span>
+              </span>
+              <span className="text-[11px] font-mono font-bold text-[#00DF1A] shrink-0">
+                Cambiar
+              </span>
+            </button>
+          )}
+
+          <div className="flex-1 flex flex-col items-center justify-center py-5">
+            <div className="text-5xl font-bold tabular-nums text-white tracking-tight">
+              $ {amountInput}
+            </div>
+            <span className="text-xs font-mono text-zinc-400 pt-2">
+              Margen disponible: {formatCents(availableCents)}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 pb-3">
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "00", "0", "DEL"].map(
+              (k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => onKeyPress(k)}
+                  className="h-12 rounded-2xl bg-[#1F232D] active:scale-95 text-base font-bold text-white cursor-pointer"
+                >
+                  {k === "DEL" ? "⌫" : k}
+                </button>
+              )
+            )}
+          </div>
+
+          {sendError && (
+            <p className="text-xs text-red-400 text-center font-mono pb-2">
+              {sendError}
+            </p>
+          )}
+
+          <div className="pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+            <SlideToConfirm
+              key={sendError ?? "ok"}
+              label={
+                sending
+                  ? "Enviando…"
+                  : recipient
+                  ? `Deslizá para pagar a $${recipient.alias}`
+                  : "Elegí un contacto"
+              }
+              disabled={!recipient || sending}
+              onConfirm={onConfirm}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================================
    PANTALLA PRINCIPAL LEMON CASH MOBILE — TL real contra API v0
    ============================================================================ */
 function WalletScreen({
@@ -1558,120 +1721,35 @@ function WalletScreen({
           />
         )}
 
+        {/* VISTA PAGAR FULL SCREEN — alias -> monto -> slide */}
+        {activeSheet === "send" && (
+          <PayView
+            recipients={recipients}
+            recipient={recipient}
+            onSelectRecipient={setRecipient}
+            amountInput={amountInput}
+            onKeyPress={handleKeyPress}
+            sending={sending}
+            sendError={sendError}
+            availableCents={me.available_cents}
+            isReal={isReal}
+            coinSymbol={activeCoin.symbol}
+            onConfirm={handleConfirmSend}
+            onClose={() => setActiveSheet(null)}
+          />
+        )}
+
         {/* 4. BOTTOM SHEETS ULTRA LIMPIOS (SIN BLOQUES DE TEXTO) */}
         {activeSheet !== null &&
           activeSheet !== "qr" &&
-          activeSheet !== "scan" && (
+          activeSheet !== "scan" &&
+          activeSheet !== "send" && (
           <div
             className="absolute inset-0 z-30 bg-black/75 backdrop-blur-xs flex flex-col justify-end"
             onClick={(e) => {
               if (e.target === e.currentTarget) setActiveSheet(null);
             }}
           >
-            {/* ENVIAR / PAGAR */}
-            {activeSheet === "send" && (
-              <div className="max-h-[85%] overflow-y-auto rounded-t-[32px] bg-[#161920] border-t border-white/15 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-white">
-                    Pagar en TL
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSheet(null)}
-                    aria-label="Cerrar"
-                    className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-zinc-300 cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {!isReal ? (
-                  <p className="text-center text-sm text-zinc-400 py-6">
-                    {activeCoin.symbol} no está disponible en esta demo. Elegí
-                    TL para pagar.
-                  </p>
-                ) : (
-                  <>
-                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                      {recipients.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => setRecipient(p)}
-                          className={`shrink-0 h-10 px-4 rounded-full border font-mono text-xs font-bold transition-all cursor-pointer ${
-                            recipient?.id === p.id
-                              ? "bg-[#00DF1A] text-[#090D0A] border-[#00DF1A]"
-                              : "bg-[#1F232D] text-zinc-200 border-white/10 hover:border-white/25"
-                          }`}
-                        >
-                          ${p.alias}
-                        </button>
-                      ))}
-                      {recipients.length === 0 && (
-                        <span className="text-xs text-zinc-500 font-mono py-2">
-                          Cargando contactos…
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="text-center py-3">
-                      <div className="text-4xl font-bold tabular-nums text-white">
-                        $ {amountInput}
-                      </div>
-                      <span className="text-xs font-mono text-zinc-400">
-                        Margen disponible: {formatCents(me.available_cents)}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        "1",
-                        "2",
-                        "3",
-                        "4",
-                        "5",
-                        "6",
-                        "7",
-                        "8",
-                        "9",
-                        "00",
-                        "0",
-                        "DEL",
-                      ].map((k) => (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => handleKeyPress(k)}
-                          className="h-12 rounded-2xl bg-[#1F232D] active:scale-95 text-base font-bold text-white cursor-pointer"
-                        >
-                          {k === "DEL" ? "⌫" : k}
-                        </button>
-                      ))}
-                    </div>
-
-                    {sendError && (
-                      <p className="text-xs text-red-400 text-center font-mono">
-                        {sendError}
-                      </p>
-                    )}
-
-                    <SlideToConfirm
-                      key={sendError ?? "ok"}
-                      label={
-                        sending
-                          ? "Enviando…"
-                          : recipient
-                          ? `Desliza para pagar a $${recipient.alias}`
-                          : "Elegí un contacto"
-                      }
-                      disabled={!recipient || sending}
-                      onConfirm={handleConfirmSend}
-                    />
-                  </>
-                )}
-              </div>
-            )}
-
             {/* CREDITO — scoring por CUIT (simulación front-only) + margen real */}
             {activeSheet === "loan" && (
               <div className="max-h-[85%] overflow-y-auto rounded-t-[32px] bg-[#161920] border-t border-white/15 p-5 space-y-4">
