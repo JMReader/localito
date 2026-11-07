@@ -633,6 +633,44 @@ function SlideToConfirm({
   );
 }
 
+function TxRow({ tx }: { tx: Transaction }) {
+  return (
+    <div className="w-full rounded-[18px] bg-[#15181F] border border-white/5 p-3.5 flex items-center justify-between">
+      <div className="flex items-center gap-3 min-w-0">
+        <div
+          className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+            tx.direction === "in"
+              ? "bg-[#00DF1A]/15 text-[#00DF1A]"
+              : "bg-white/5 text-zinc-300"
+          }`}
+        >
+          {tx.direction === "in" ? (
+            <ArrowDownLeft className="w-4 h-4" />
+          ) : (
+            <ArrowUpRight className="w-4 h-4" />
+          )}
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-white truncate">
+            {tx.counterparty.display_name}
+          </div>
+          <div className="text-[11px] font-mono text-zinc-500 truncate">
+            {tx.note ?? new Date(tx.created_at).toLocaleDateString("es-AR")}
+          </div>
+        </div>
+      </div>
+      <span
+        className={`text-sm font-bold tabular-nums shrink-0 ${
+          tx.direction === "in" ? "text-[#00DF1A]" : "text-white"
+        }`}
+      >
+        {tx.direction === "in" ? "+" : "−"}
+        {formatCents(tx.amount_cents)}
+      </span>
+    </div>
+  );
+}
+
 /* ============================================================================
    FORMATO ARS — la API trabaja en centavos enteros; 1 TL = 1 ARS nominal.
    ============================================================================ */
@@ -1022,6 +1060,7 @@ function WalletScreen({
   const idemKeyRef = useRef<string>("");
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [tab, setTab] = useState<"home" | "activity">("home");
   const [loanStep, setLoanStep] = useState<"cuit" | "amount">("cuit");
   const [loanCuit, setLoanCuit] = useState<string>("");
   const [cuitProfile, setCuitProfile] = useState<CuitScoreProfile | null>(null);
@@ -1241,6 +1280,8 @@ function WalletScreen({
 
         {/* 2. CUERPO PRINCIPAL */}
         <div className="flex-1 overflow-y-auto px-5 pb-[calc(5rem+env(safe-area-inset-bottom))] flex flex-col items-center">
+          {tab === "home" && (
+          <>
           {/* MONEDA 3D ASCII GIGANTE Y NITIDA EN EL CENTRO */}
           <div className="-mt-1 -mb-2 flex items-center justify-center">
             <HighDefAsciiCoin
@@ -1398,7 +1439,7 @@ function WalletScreen({
             })}
           </div>
 
-          {/* MOVIMIENTOS — ledger real (GET /transactions) + crédito simulado */}
+          {/* MOVIMIENTOS — últimos 5; la lista completa vive en el tab Actividad */}
           <div className="w-full space-y-2 mt-6">
             <p className="text-xs font-mono text-zinc-500 pb-1">MOVIMIENTOS</p>
             {feedItems.length === 0 && (
@@ -1406,46 +1447,38 @@ function WalletScreen({
                 Todavía no hay movimientos.
               </p>
             )}
-            {feedItems.map((tx) => (
-              <div
-                key={tx.id}
-                className="w-full rounded-[18px] bg-[#15181F] border border-white/5 p-3.5 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-                      tx.direction === "in"
-                        ? "bg-[#00DF1A]/15 text-[#00DF1A]"
-                        : "bg-white/5 text-zinc-300"
-                    }`}
-                  >
-                    {tx.direction === "in" ? (
-                      <ArrowDownLeft className="w-4 h-4" />
-                    ) : (
-                      <ArrowUpRight className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-white truncate">
-                      {tx.counterparty.display_name}
-                    </div>
-                    <div className="text-[11px] font-mono text-zinc-500 truncate">
-                      {tx.note ??
-                        new Date(tx.created_at).toLocaleDateString("es-AR")}
-                    </div>
-                  </div>
-                </div>
-                <span
-                  className={`text-sm font-bold tabular-nums shrink-0 ${
-                    tx.direction === "in" ? "text-[#00DF1A]" : "text-white"
-                  }`}
-                >
-                  {tx.direction === "in" ? "+" : "−"}
-                  {formatCents(tx.amount_cents)}
-                </span>
-              </div>
+            {feedItems.slice(0, 5).map((tx) => (
+              <TxRow key={tx.id} tx={tx} />
             ))}
+            {feedItems.length > 5 && (
+              <button
+                type="button"
+                onClick={() => setTab("activity")}
+                className="w-full text-center text-xs font-mono font-bold text-[#00DF1A] py-2 cursor-pointer"
+              >
+                Ver todos →
+              </button>
+            )}
           </div>
+          </>
+          )}
+
+          {/* TAB ACTIVIDAD — historial completo (GET /transactions + simulado) */}
+          {tab === "activity" && (
+            <div className="w-full pt-3 space-y-2">
+              <p className="text-xs font-mono text-zinc-500 pb-1">
+                ACTIVIDAD · {feedItems.length} MOVIMIENTOS
+              </p>
+              {feedItems.length === 0 && (
+                <p className="text-xs text-zinc-500 font-mono py-10 text-center">
+                  Todavía no hay movimientos.
+                </p>
+              )}
+              {feedItems.map((tx) => (
+                <TxRow key={tx.id} tx={tx} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 3. BOTTOM BAR LEMON (SOLO ICONOS LIMPIOS) */}
@@ -1455,11 +1488,33 @@ function WalletScreen({
         >
           <button
             type="button"
-            onClick={() => setActiveSheet(null)}
+            onClick={() => {
+              setTab("home");
+              setActiveSheet(null);
+            }}
             aria-label="Inicio"
-            className="w-11 h-11 flex items-center justify-center text-[#00DF1A] cursor-pointer"
+            className={`w-11 h-11 flex items-center justify-center cursor-pointer ${
+              tab === "home" ? "text-[#00DF1A]" : "text-zinc-500"
+            }`}
           >
-            <div className="w-2.5 h-2.5 rounded-full bg-[#00DF1A]" />
+            <div
+              className={`w-2.5 h-2.5 rounded-full ${
+                tab === "home" ? "bg-[#00DF1A]" : "bg-zinc-600"
+              }`}
+            />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTab("activity")}
+            aria-label="Actividad"
+            className={`w-11 h-11 flex items-center justify-center cursor-pointer transition-colors ${
+              tab === "activity"
+                ? "text-[#00DF1A]"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <ArrowLeftRight className="w-5 h-5" />
           </button>
 
           <button
