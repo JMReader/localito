@@ -2,7 +2,7 @@
   "meta": {
     "feature_id": "localito",
     "document_type": "technical_specification",
-    "status": "pending_approval",
+    "status": "approved",
     "version": "0.1.0",
     "language": "es-AR",
     "created": "2026-11-07",
@@ -26,9 +26,22 @@
       "demo_slice_authorized": true,
       "demo_slice_authorized_at": "2026-11-07",
       "demo_slice_scope": "registro/demo login, saldo, pago entre participantes, historial y vista de comercio",
-      "technical_spec_approved": false,
-      "todos_approved": false,
-      "note": "La spec funcional está aprobada y el arranque del slice demostrable fue autorizado explícitamente en conversación. La spec técnica y el plan de tareas todavía no tienen aprobación explícita."
+      "technical_spec_approved": true,
+      "todos_approved": true,
+      "note": "La spec funcional está aprobada y el arranque del slice demostrable fue autorizado explícitamente en conversación. La spec técnica y el plan de tareas todavía no tienen aprobación explícita.",
+      "technical_spec_approved_at": "2026-11-07",
+      "todos_approved_at": "2026-11-07",
+      "technical_approval_channel": "conversacion con el agente (OpenCode)",
+      "technical_approval_evidence": "Aprobacion explicita del usuario: 'dale que si a todo'.",
+      "blockers_pre_approved_by_user": {
+        "O1": "1 unidad = 1 ARS nominal, montos en centavos",
+        "O2": "90 dias",
+        "O3": "pesos con conversion manual y registro auditable",
+        "O4": "Fondo paga USDC con tope y factor de recupero",
+        "G01": "no prometer reversibilidad hasta definir politica",
+        "G03": "porcentaje configurable; valor pendiente",
+        "G04": "definir equivalencia antes de conectar el Fondo"
+      }
     },
     "conventions": {
       "keys": "snake_case",
@@ -1311,10 +1324,10 @@
     "implementation_started": true,
     "implementation_scope": "demo_slice: registro/demo login, saldo, pago, historial, vista de comercio",
     "functional_spec_approved": true,
-    "technical_spec_approved": false,
-    "todos_approved": false,
+    "technical_spec_approved": true,
+    "todos_approved": true,
     "full_scope_blocked": true,
-    "full_scope_blocked_reason": "El alcance completo requiere aprobación explícita de esta spec técnica y del plan de tareas, y decisión con Oky sobre O1, O2, O3, O4, G01, G03 y G04.",
+    "full_scope_blocked_reason": "Aprobacion tecnica y de todos recibida; quedan las decisiones O1-O4, G01, G03 y G04 con Oky.",
     "demo_slice_blocked_by": [],
     "pending_decisions_with_oky": [
       "O1",
@@ -1325,7 +1338,7 @@
       "G03",
       "G04"
     ],
-    "next_step": "Revisar y aprobar docs/technical-spec.json y docs/todos.json; integrar la PWA de Oky contra el backend ya implementado; decidir O1-O4, G01, G03 y G04 antes del alcance completo.",
+    "next_step": "Integrar la PWA de Oky contra el backend y resolver los 7 bloqueantes con Oky antes del alcance completo.",
     "demo_slice_backend_status": "implemented_tested"
   }
 }

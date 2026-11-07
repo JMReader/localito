@@ -57,6 +57,13 @@
       "in_progress": "Trabajo activo en este momento.",
       "pending": "Planificado, sin empezar.",
       "blocked": "No puede empezar hasta resolver una decisión abierta."
+    },
+    "approval": {
+      "approved": true,
+      "approved_at": "2026-11-07",
+      "approved_by": "usuario (mdf-angel)",
+      "channel": "conversacion con el agente (OpenCode)",
+      "evidence": "Aprobacion explicita del usuario: 'dale que si a todo'."
     }
   },
   "phases": [
