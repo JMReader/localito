@@ -1,0 +1,1850 @@
+{
+  "meta": {
+    "feature_id": "localito",
+    "document_type": "functional_specification",
+    "status": "pending_approval",
+    "version": "0.1.0-draft",
+    "language": "es-AR",
+    "created": "2026-11-07",
+    "title": "Localito — Especificación funcional (MVP)",
+    "product": {
+      "working_name": "Localito",
+      "working_name_status": "provisional",
+      "source_product_name": "TwinLocal",
+      "note": "Nombre de trabajo. El nombre definitivo no está decidido. La spec describe el producto TwinLocal v0.1, inspirado en el modelo Sardex de crédito mutuo."
+    },
+    "source": {
+      "title": "TwinLocal — Documento de producto (v0.1)",
+      "document_id": "twinlocal-producto-v0.1",
+      "status_in_source": "borrador para arrancar",
+      "consulted_copy": "C:/Users/angel/Desktop/todo/boveda notebook/projects/hackatwins/docs/twinlocal-producto-v0.1.md",
+      "expected_repo_path": "docs/twinlocal-producto-v0.1.md",
+      "repo_copy_available_at_drafting_time": false,
+      "note": "Copia del repositorio no presente en este checkout; se usó la copia del cerebro indicada. El documento fuente sigue siendo la fuente de verdad."
+    },
+    "gate": {
+      "stage": "functional",
+      "next_document": "technical-spec.json",
+      "requires_explicit_user_approval": true,
+      "implementation_blocked": true
+    },
+    "labels": {
+      "DECIDIDO": "Decisión ya tomada en el documento fuente.",
+      "SUPUESTO": "Valor inicial para calibrar, cambiable.",
+      "ABIERTO": "Requiere decisión humana; no debe asumirse."
+    }
+  },
+  "scope": {
+    "in_scope": [
+      {
+        "id": "S01",
+        "statement": "Circuito cerrado de crédito mutuo entre miembros, con saldo con signo por miembro y suma agregada de saldos igual a cero."
+      },
+      {
+        "id": "S02",
+        "statement": "Libro mayor único y auditable del circuito, con historial de movimientos consultable por el miembro y por el operador."
+      },
+      {
+        "id": "S03",
+        "statement": "Alta de miembros asistida por un broker, con verificación de los datos del comercio o prestador."
+      },
+      {
+        "id": "S04",
+        "statement": "Ciclo de vida del miembro: pendiente, activo, suspendido, en mora, incobrable por castigo y egresado."
+      },
+      {
+        "id": "S05",
+        "statement": "Línea de crédito por miembro con tope duro y tope de saldo positivo."
+      },
+      {
+        "id": "S06",
+        "statement": "Scoring y propuesta de límites a partir de facturación verificada y stock con descuento, con crecimiento por historial de cumplimiento."
+      },
+      {
+        "id": "S07",
+        "statement": "Pagos internos entre miembros, iniciados por código QR o por búsqueda en el directorio, con confirmación y recibo."
+      },
+      {
+        "id": "S08",
+        "statement": "Cobro por parte de comercios y prestadores mediante QR estático o QR con monto."
+      },
+      {
+        "id": "S09",
+        "statement": "Directorio de la red con búsqueda por nombre y por rubro, y vista de qué se ofrece en la red."
+      },
+      {
+        "id": "S10",
+        "statement": "Mora: vencimiento del plazo de saldado, período de gracia, recordatorios y bloqueo del deudor como emisor de pagos."
+      },
+      {
+        "id": "S11",
+        "statement": "Castigo (write-off) de deuda incobrable y registro de la pérdida."
+      },
+      {
+        "id": "S12",
+        "statement": "Fondo de Garantía: aportes de inversores, plazos, retiros al vencimiento o por cola, ingresos por cuotas, penalidades y recuperos, y compensación al acreedor con tope."
+      },
+      {
+        "id": "S13",
+        "statement": "Cuota de membresía escalonada por tamaño del miembro y penalidad por mora."
+      },
+      {
+        "id": "S14",
+        "statement": "Consola de broker y operador: altas, límites, estados, parámetros, castigos, compensaciones y auditoría."
+      },
+      {
+        "id": "S15",
+        "statement": "Pausa de emergencia del circuito."
+      },
+      {
+        "id": "S16",
+        "statement": "App web instalable (PWA) como único canal del MVP, con vistas de miembro, comercio, inversor y consola administrativa."
+      },
+      {
+        "id": "S17",
+        "statement": "Notificaciones por email y push. Sin mensajería conversacional tipo WhatsApp."
+      },
+      {
+        "id": "S18",
+        "statement": "Datos de prueba y simulación de escenarios para calibrar parámetros y medir las métricas del piloto."
+      }
+    ],
+    "out_of_scope": [
+      {
+        "id": "X01",
+        "statement": "Canje del saldo del circuito por pesos o por USDC. No existe off-ramp para miembros (D6)."
+      },
+      {
+        "id": "X02",
+        "statement": "Stablecoin, exchange, banco o cualquier producto canjeable por dinero fiduciario."
+      },
+      {
+        "id": "X03",
+        "statement": "Colateral en stablecoins aportado por miembros y cualquier mecanismo de demurrage u oxidación del saldo inactivo."
+      },
+      {
+        "id": "X04",
+        "statement": "WhatsApp o cualquier canal conversacional de mensajería como interfaz del producto (D5)."
+      },
+      {
+        "id": "X05",
+        "statement": "Marketplace avanzado o matching automático de ofertas."
+      },
+      {
+        "id": "X06",
+        "statement": "App móvil nativa; la app web instalable es el único canal del MVP."
+      },
+      {
+        "id": "X07",
+        "statement": "Tasa de interés dinámica por utilización del fondo."
+      },
+      {
+        "id": "X08",
+        "statement": "Interoperabilidad con otras redes de crédito."
+      },
+      {
+        "id": "X09",
+        "statement": "Integración con pasarelas de cobro de comercios y con sistemas de gestión."
+      },
+      {
+        "id": "X10",
+        "statement": "Ampliaciones de autenticación fuera del MVP (O7) y autogestión de credenciales por parte del miembro más allá de lo que resuelva O9."
+      },
+      {
+        "id": "X11",
+        "statement": "Reglas de negocio no definidas en el documento fuente, listadas en additional_gaps."
+      }
+    ]
+  },
+  "actors": [
+    {
+      "id": "A01",
+      "name": "Comercio",
+      "description": "Vende y compra dentro de la red. Tiene línea de crédito y tope de saldo positivo.",
+      "channel": "App (PWA)",
+      "main_capabilities": ["pagar", "cobrar con QR", "consultar saldo, límite y deuda", "ver historial", "figurar en el directorio"]
+    },
+    {
+      "id": "A02",
+      "name": "Prestador",
+      "description": "Ofrece oficios, servicios o tutorías dentro de la red. Misma operatoria que el comercio en límites y cobros.",
+      "channel": "App (PWA)",
+      "main_capabilities": ["pagar", "cobrar con QR", "consultar saldo, límite y deuda", "ver historial", "figurar en el directorio"]
+    },
+    {
+      "id": "A03",
+      "name": "Consumidor",
+      "description": "Usa saldo para comprar dentro de la red. Línea de crédito baja o cero.",
+      "channel": "App (PWA)",
+      "main_capabilities": ["pagar", "consultar saldo y disponible", "ver historial"]
+    },
+    {
+      "id": "A04",
+      "name": "Broker",
+      "description": "Persona de confianza que da de alta miembros, verifica facturación o stock y propone límites.",
+      "channel": "Consola administrativa",
+      "main_capabilities": ["alta de miembros", "verificación de datos", "propuesta y ajuste de límites dentro de topes", "suspender y reactivar", "ver estado de sus miembros"]
+    },
+    {
+      "id": "A05",
+      "name": "Operador",
+      "description": "Administra parámetros, cuotas, suspensiones, castigos y compensaciones.",
+      "channel": "Consola administrativa",
+      "main_capabilities": ["parámetros globales", "castigos", "compensaciones", "registro de ingresos del Fondo", "auditoría", "pausa"]
+    },
+    {
+      "id": "A06",
+      "name": "Inversor",
+      "description": "Aporta USDC al Fondo de Garantía y cobra rendimiento proveniente de cuotas, penalidades y recuperos.",
+      "channel": "App (PWA), vista de inversor",
+      "main_capabilities": ["aportar con plazo", "ver posiciones y valor de la participación", "solicitar retiro", "ver ingresos del Fondo y advertencias de riesgo"]
+    },
+    {
+      "id": "A07",
+      "name": "Guardián",
+      "description": "Responsable de pausar el circuito ante una emergencia.",
+      "channel": "Acceso restringido de emergencia",
+      "main_capabilities": ["pausar", "reanudar"]
+    },
+    {
+      "id": "A08",
+      "name": "Proceso automático del sistema (keeper)",
+      "description": "Proceso no humano que marca morosos, envía recordatorios y procesa la cola de retiros. Sus acciones deben quedar auditadas.",
+      "channel": "Sin interfaz propia",
+      "main_capabilities": ["marcar mora", "recordatorios", "procesar cola de retiros", "conciliar"]
+    }
+  ],
+  "member_lifecycle": {
+    "states": [
+      {
+        "id": "pending",
+        "name": "Pendiente",
+        "description": "Miembro dado de alta por un broker, aún sin activación ni límites asignados.",
+        "can_pay": false,
+        "can_receive": false,
+        "can_be_edited_by": ["broker", "operador"]
+      },
+      {
+        "id": "active",
+        "name": "Activo",
+        "description": "Miembro habilitado para pagar y cobrar dentro de los límites asignados.",
+        "can_pay": true,
+        "can_receive": true,
+        "can_be_edited_by": ["broker", "operador"]
+      },
+      {
+        "id": "suspended",
+        "name": "Suspendido",
+        "description": "Miembro bloqueado temporalmente por decisión de broker u operador. No puede iniciar pagos.",
+        "can_pay": false,
+        "can_receive": false,
+        "can_be_edited_by": ["broker", "operador"]
+      },
+      {
+        "id": "delinquent",
+        "name": "En mora",
+        "description": "Miembro con saldo negativo cuyo plazo de saldado venció. No puede iniciar pagos.",
+        "can_pay": false,
+        "can_receive": false,
+        "can_be_edited_by": ["operador"]
+      },
+      {
+        "id": "defaulted",
+        "name": "Incobrable (castigado)",
+        "description": "Miembro cuya deuda fue castigada por el operador después del período de gracia.",
+        "can_pay": false,
+        "can_receive": false,
+        "can_be_edited_by": ["operador"]
+      },
+      {
+        "id": "exited",
+        "name": "Egresado",
+        "description": "Miembro que se retira de la red con saldo en cero.",
+        "can_pay": false,
+        "can_receive": false,
+        "can_be_edited_by": ["operador"]
+      }
+    ],
+    "transitions": [
+      {
+        "from": "pending",
+        "to": "active",
+        "trigger": "El broker activa al miembro y asigna límite de crédito y tope positivo dentro de los topes globales.",
+        "actor": "broker"
+      },
+      {
+        "from": "active",
+        "to": "suspended",
+        "trigger": "Suspensión por decisión de broker u operador, con motivo registrado.",
+        "actor": "broker_or_operador"
+      },
+      {
+        "from": "suspended",
+        "to": "active",
+        "trigger": "Reactivación por decisión de broker u operador, con motivo registrado.",
+        "actor": "broker_or_operador"
+      },
+      {
+        "from": "active",
+        "to": "delinquent",
+        "trigger": "El saldo es negativo y venció la fecha de deuda más el plazo de saldado.",
+        "actor": "proceso_automatico"
+      },
+      {
+        "from": "delinquent",
+        "to": "defaulted",
+        "trigger": "El operador castiga la deuda después de transcurrido el período de gracia.",
+        "actor": "operador"
+      },
+      {
+        "from": "active",
+        "to": "exited",
+        "trigger": "El miembro solicita el egreso y su saldo es cero.",
+        "actor": "operador"
+      }
+    ],
+    "lifecycle_open_points": [
+      "La reincorporación de un miembro en mora a activo una vez saldado no está definida en la fuente (ver G02).",
+      "No está definido si un miembro suspendido, en mora o incobrable puede egresar, ni cómo se salda su saldo pendiente (ver G02)."
+    ]
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "status": "DECIDIDO",
+      "statement": "Modelo base de crédito mutuo estilo Sardex: saldos negativos con límite y suma total de saldos igual a cero.",
+      "functional_effect": "Los miembros se acreditan y debitan entre sí; no hay emisión de dinero contra colateral."
+    },
+    {
+      "id": "D2",
+      "status": "DECIDIDO",
+      "statement": "Interés al miembro 0%. El negocio se sostiene con cuota de membresía y penalidades.",
+      "functional_effect": "Ningún pago genera interés; los ingresos del sistema provienen de cuotas, penalidades y recuperos."
+    },
+    {
+      "id": "D5",
+      "status": "DECIDIDO",
+      "statement": "Sin WhatsApp. Canal app web instalable (PWA) primero; móvil después sobre la misma experiencia de producto.",
+      "functional_effect": "Todo flujo de miembro, comercio e inversor ocurre en la app web instalable; no hay flujo por mensajería."
+    },
+    {
+      "id": "D6",
+      "status": "DECIDIDO",
+      "statement": "Los saldos del circuito no se canjean por pesos ni por USDC. No hay off-ramp para miembros.",
+      "functional_effect": "El saldo solo sirve para comprar dentro de la red; la app no ofrece ninguna acción de canje o retiro de saldo para miembros."
+    },
+    {
+      "id": "D7",
+      "status": "DECIDIDO",
+      "statement": "Miembros sin conocimiento técnico: la plataforma opera la cuenta del miembro en el MVP y absorbe los costos de operación del servicio.",
+      "functional_effect": "El miembro solo inicia sesión, consulta su estado y confirma operaciones; no administra credenciales técnicas ni ejecuta pasos de infraestructura.",
+      "note": "El detalle concreto de custodia de credenciales permanece abierto en O9."
+    },
+    {
+      "id": "D8",
+      "status": "DECIDIDO",
+      "statement": "El Fondo de Garantía se denomina en USDC y tiene contabilidad propia, separada del libro mayor del circuito.",
+      "functional_effect": "El valor del Fondo, sus aportes, retiros e ingresos se informan por separado del saldo de los miembros."
+    },
+    {
+      "id": "D9",
+      "status": "DECIDIDO",
+      "statement": "Línea de crédito de cada miembro en función de facturación verificada y/o stock con descuento, con tope duro y crecimiento por historial.",
+      "functional_effect": "El límite no es discrecional: se calcula, se documenta el motivo y nunca supera el tope global."
+    },
+    {
+      "id": "D10",
+      "status": "DECIDIDO",
+      "statement": "Si existe un costo por préstamo en la capa de fondeo, es una tasa fija. No se sube la tasa a deudores existentes por retiros de inversores.",
+      "functional_effect": "Las condiciones vigentes al momento del aporte o del préstamo no cambian retroactivamente por decisiones de otros inversores."
+    }
+  ],
+  "decisions_not_reproduced": {
+    "ids": ["D3", "D4"],
+    "reason": "Son decisiones de implementación del documento fuente. No se reproducen en esta especificación funcional y no condicionan ningún criterio de aceptación."
+  },
+  "assumptions": [
+    {
+      "id": "AS-D11",
+      "status": "SUPUESTO",
+      "statement": "En el documento fuente: contratos del MVP no actualizables, con pausa de emergencia.",
+      "functional_representation": "Solo se recoge la capacidad funcional de pausa de emergencia (S15). La no actualización es una decisión de implementación y no se compromete como requisito funcional en esta spec.",
+      "committed_as_functional_requirement": false
+    },
+    {
+      "id": "AS-PARAMS",
+      "status": "SUPUESTO",
+      "statement": "Todos los parámetros numéricos son valores iniciales para calibrar y pueden cambiar con decisión del operador y registro del cambio.",
+      "functional_representation": "La app muestra los valores vigentes; ningún valor está fijado de forma inmutable en la experiencia."
+    },
+    {
+      "id": "AS-CURRENCY",
+      "status": "ABIERTO",
+      "statement": "La unidad de cuenta del circuito no está definida (O1).",
+      "functional_representation": "La spec usa el término unidades sin asociarlo a pesos ni a dólares."
+    }
+  ],
+  "parameters": [
+    {
+      "id": "P01",
+      "name": "plazo_de_saldado",
+      "initial_value": "90 días",
+      "label": "SUPUESTO",
+      "depends_on_open_question": "O2",
+      "note": "Tiempo desde que el saldo pasa a negativo hasta el vencimiento."
+    },
+    {
+      "id": "P02",
+      "name": "periodo_de_gracia",
+      "initial_value": "15 días",
+      "label": "SUPUESTO",
+      "depends_on_open_question": null,
+      "note": "Tiempo entre el vencimiento y la habilitación del castigo."
+    },
+    {
+      "id": "P03",
+      "name": "tope_de_saldo_positivo",
+      "initial_value": "aproximadamente 10% de la facturación mensual verificada, configurable",
+      "label": "SUPUESTO",
+      "depends_on_open_question": null,
+      "note": "Evita la acumulación de saldo en un solo miembro."
+    },
+    {
+      "id": "P04",
+      "name": "comision_por_transaccion",
+      "initial_value": "0%",
+      "label": "DECIDIDO",
+      "depends_on_open_question": null,
+      "note": "Derivado de D2."
+    },
+    {
+      "id": "P05",
+      "name": "penalidad_por_mora",
+      "initial_value": "porcentaje fijo sobre el monto vencido; valor no definido en la fuente",
+      "label": "SUPUESTO",
+      "depends_on_open_question": null,
+      "note": "Se destina al Fondo. El valor concreto falta (G03)."
+    },
+    {
+      "id": "P06",
+      "name": "liquidez_minima_del_fondo",
+      "initial_value": "15% de los activos no comprometidos",
+      "label": "SUPUESTO",
+      "depends_on_open_question": null,
+      "note": "Porción reservada para retiros."
+    },
+    {
+      "id": "P07",
+      "name": "plazos_de_inversor",
+      "initial_value": "30, 90 y 180 días",
+      "label": "SUPUESTO",
+      "depends_on_open_question": null,
+      "note": "Retiro solo al vencimiento o por cola."
+    },
+    {
+      "id": "P08",
+      "name": "descuento_sobre_stock",
+      "initial_value": "50% sobre el valor declarado verificado",
+      "label": "SUPUESTO",
+      "depends_on_open_question": null,
+      "note": "Perecederos con descuento mayor o excluidos."
+    },
+    {
+      "id": "P09",
+      "name": "tope_de_aporte_por_inversor",
+      "initial_value": "configurable; valor no definido en la fuente",
+      "label": "SUPUESTO",
+      "depends_on_open_question": null,
+      "note": "Limita el riesgo en la fase piloto."
+    },
+    {
+      "id": "P10",
+      "name": "tope_global_de_credito",
+      "initial_value": "definido por el operador; valor no definido en la fuente",
+      "label": "SUPUESTO",
+      "depends_on_open_question": null,
+      "note": "Ningún límite individual puede superarlo."
+    },
+    {
+      "id": "P11",
+      "name": "precision_de_la_unidad",
+      "initial_value": "2 decimales (centésimos)",
+      "label": "SUPUESTO",
+      "depends_on_open_question": "O1",
+      "note": "La interpretación monetaria depende de O1."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "O1",
+      "question": "Unidad de cuenta del circuito",
+      "options": [
+        "a) 1 unidad = 1 peso argentino nominal",
+        "b) 1 unidad = 1 dólar de referencia, con precios mostrados en pesos"
+      ],
+      "provisional_recommendation": "a) con plazos cortos de 60 a 90 días para limitar el daño de la inflación a los acreedores. Revisar con datos.",
+      "status": "ABIERTO",
+      "resolved": false,
+      "affects": ["precisión y presentación de montos", "plazos de saldado", "calibración del scoring"]
+    },
+    {
+      "id": "O2",
+      "question": "Plazo de saldado de deuda",
+      "options": ["60 días", "90 días", "180 días", "365 días"],
+      "provisional_recommendation": "90 días.",
+      "status": "ABIERTO",
+      "resolved": false,
+      "affects": ["P01", "mora", "vencimiento mostrado al miembro"]
+    },
+    {
+      "id": "O3",
+      "question": "Moneda de cobro de las cuotas de membresía",
+      "options": [
+        "pesos cobrados por una pasarela y convertidos a USDC por el operador",
+        "otra moneda o medio de cobro a definir"
+      ],
+      "provisional_recommendation": "Pesos, con conversión manual y registro auditable del ingreso al Fondo.",
+      "status": "ABIERTO",
+      "resolved": false,
+      "affects": ["cobro de cuota de membresía", "ingresos del Fondo"]
+    },
+    {
+      "id": "O4",
+      "question": "Mecanismo de compensación ante incumplimiento",
+      "options": [
+        "a) el Fondo paga USDC al acreedor y se extingue el crédito equivalente",
+        "b) solo se registra la pérdida contra el valor del Fondo",
+        "c) combinación con tope por período"
+      ],
+      "provisional_recommendation": "a) con tope por período y factor de recupero menor a 1.",
+      "status": "ABIERTO",
+      "resolved": false,
+      "affects": ["uso del Fondo", "valor de la participación del inversor", "tratamiento del acreedor castigado"]
+    },
+    {
+      "id": "O5",
+      "question": "Privacidad del registro del circuito",
+      "options": [
+        "a) registro público auditable con identificadores pseudónimos",
+        "b) red permisionada con acceso restringido"
+      ],
+      "provisional_recommendation": "a) en el MVP, documentando el riesgo de exposición comercial.",
+      "status": "ABIERTO",
+      "resolved": false,
+      "affects": ["qué datos ve un tercero", "aviso de privacidad al miembro"]
+    },
+    {
+      "id": "O6",
+      "question": "Criterio de envejecimiento de la deuda",
+      "options": [
+        "fecha de primera deuda (simple y aproximada)",
+        "asignación por orden de movimientos (exacta)"
+      ],
+      "provisional_recommendation": "Simple en el MVP; se documenta que es conservador.",
+      "status": "ABIERTO",
+      "resolved": false,
+      "affects": ["cálculo de mora", "mensaje de vencimiento al miembro"]
+    },
+    {
+      "id": "O7",
+      "question": "Mecanismo de autenticación y confirmación de pagos",
+      "options": [
+        "código de un solo uso por email",
+        "código de un solo uso por SMS",
+        "credenciales resistentes a phishing del tipo passkey"
+      ],
+      "provisional_recommendation": "Código por email más PIN en el MVP; opciones más fuertes en un hito posterior.",
+      "status": "ABIERTO",
+      "resolved": false,
+      "affects": ["login", "confirmación de pago", "bloqueo por intentos fallidos"]
+    },
+    {
+      "id": "O8",
+      "question": "Encuadre regulatorio del Fondo y de la custodia",
+      "options": [
+        "revisión legal previa al ingreso de dinero real",
+        "otro esquema a definir con asesoría"
+      ],
+      "provisional_recommendation": "Revisión legal obligatoria antes de operar con dinero real.",
+      "status": "ABIERTO",
+      "resolved": false,
+      "affects": ["captación de inversores", "custodia", "comunicaciones del producto"]
+    },
+    {
+      "id": "O9",
+      "question": "Modelo de custodia de las credenciales del miembro",
+      "options": [
+        "a) la plataforma custodia y opera la cuenta en el MVP",
+        "b) el miembro gestiona sus propias credenciales",
+        "c) modelo intermedio de delegación de firma"
+      ],
+      "provisional_recommendation": "a) en el MVP; evaluar el modelo intermedio después.",
+      "status": "ABIERTO",
+      "resolved": false,
+      "affects": ["experiencia de alta", "recuperación de acceso", "responsabilidad operativa"]
+    }
+  ],
+  "additional_gaps": [
+    {
+      "id": "G01",
+      "question": "Reversión, anulación o disputa de un pago ya confirmado.",
+      "status": "NO_DEFINIDO_EN_FUENTE",
+      "impact": "La spec no promete reversibilidad; requiere decisión humana antes de implementar."
+    },
+    {
+      "id": "G02",
+      "question": "Reincorporación de un miembro en mora una vez saldado y egreso con saldo distinto de cero.",
+      "status": "NO_DEFINIDO_EN_FUENTE",
+      "impact": "Afecta el ciclo de vida y los criterios de reactivación."
+    },
+    {
+      "id": "G03",
+      "question": "Valor concreto de la penalidad por mora.",
+      "status": "NO_DEFINIDO_EN_FUENTE",
+      "impact": "Sin valor, el criterio de penalidad solo puede verificarse como porcentaje configurable."
+    },
+    {
+      "id": "G04",
+      "question": "Equivalencia entre unidades del circuito y USDC del Fondo.",
+      "status": "NO_DEFINIDO_EN_FUENTE",
+      "impact": "Condiciona la compensación (O4) y el cálculo del valor de la participación."
+    },
+    {
+      "id": "G05",
+      "question": "Evidencia aceptada para verificar facturación y stock.",
+      "status": "NO_DEFINIDO_EN_FUENTE",
+      "impact": "Afecta el alta y el scoring; el broker queda como responsable de la verificación."
+    }
+  ],
+  "business_rules": [
+    {
+      "id": "BR-ACC-01",
+      "domain": "contabilidad",
+      "statement": "La suma de los saldos de todos los miembros más la cuenta de deuda castigada es siempre cero.",
+      "source": "Invariante 1 del ledger; D1"
+    },
+    {
+      "id": "BR-ACC-02",
+      "domain": "contabilidad",
+      "statement": "Cada miembro tiene un saldo con signo: puede ser negativo hasta su límite de crédito y positivo hasta su tope positivo.",
+      "source": "Secciones 5 y 13"
+    },
+    {
+      "id": "BR-ACC-03",
+      "domain": "contabilidad",
+      "statement": "Todo movimiento genera un asiento visible para ambas partes del pago y consultable por el operador con fines de auditoría.",
+      "source": "Sección 1 y 9.2"
+    },
+    {
+      "id": "BR-ACC-04",
+      "domain": "contabilidad",
+      "statement": "El reloj de deuda se activa cuando el saldo pasa de cero o positivo a negativo y se limpia cuando vuelve a cero o positivo. El envejecimiento usa la fecha de primera deuda y es aproximado y conservador.",
+      "source": "Regla 5 de pago; O6"
+    },
+    {
+      "id": "BR-ACC-05",
+      "domain": "contabilidad",
+      "statement": "Los montos se expresan con dos decimales.",
+      "source": "Parámetro decimals; SUPUESTO"
+    },
+    {
+      "id": "BR-ACC-06",
+      "domain": "contabilidad",
+      "statement": "Ninguna operación puede dejar el circuito fuera de sus invariantes contables; si una operación los violaría, se rechaza y se informa el motivo.",
+      "source": "Sección 13"
+    },
+    {
+      "id": "BR-PAY-01",
+      "domain": "pagos",
+      "statement": "Para pagar, emisor y receptor deben estar activos. El emisor no puede estar en mora.",
+      "source": "Regla 1 de pago"
+    },
+    {
+      "id": "BR-PAY-02",
+      "domain": "pagos",
+      "statement": "El monto del pago debe ser mayor que cero.",
+      "source": "Regla 2 de pago"
+    },
+    {
+      "id": "BR-PAY-03",
+      "domain": "pagos",
+      "statement": "El saldo del emisor menos el monto no puede quedar por debajo de su límite de crédito negativo.",
+      "source": "Regla 3 de pago"
+    },
+    {
+      "id": "BR-PAY-04",
+      "domain": "pagos",
+      "statement": "El saldo del receptor más el monto no puede superar su tope positivo.",
+      "source": "Regla 4 de pago"
+    },
+    {
+      "id": "BR-PAY-05",
+      "domain": "pagos",
+      "statement": "La comisión por transacción es 0% y ningún pago genera interés para el miembro.",
+      "source": "D2"
+    },
+    {
+      "id": "BR-PAY-06",
+      "domain": "pagos",
+      "statement": "Todo pago requiere la confirmación del miembro con el mecanismo vigente definido en O7 y produce un recibo consultable.",
+      "source": "Sección 9.1 y O7"
+    },
+    {
+      "id": "BR-PAY-07",
+      "domain": "pagos",
+      "statement": "Un pago confirmado se refleja en ambos saldos y en el registro auditable de forma inmediata. La política de reversión no está definida (G01).",
+      "source": "Sección 5 y G01"
+    },
+    {
+      "id": "BR-PAY-08",
+      "domain": "pagos",
+      "statement": "Un reintento del mismo pago por conexión inestable no puede duplicar el movimiento; el resultado visible es un único pago confirmado o un único error.",
+      "source": "Sección 9.2, reintentos idempotentes"
+    },
+    {
+      "id": "BR-LIM-01",
+      "domain": "límites_y_scoring",
+      "statement": "El límite propuesto surge de la menor entre un porcentaje de la facturación mensual verificada y el stock verificado con descuento, multiplicado por el factor del tier, y nunca supera el tope global.",
+      "source": "D9; sección 8.4"
+    },
+    {
+      "id": "BR-LIM-02",
+      "domain": "límites_y_scoring",
+      "statement": "Existen tres niveles de confianza (T0, T1, T2). Los miembros nuevos arrancan en T0 con límites bajos y suben por historial de saldado a tiempo, antigüedad, cumplimiento y volumen.",
+      "source": "Sección 8.4"
+    },
+    {
+      "id": "BR-LIM-03",
+      "domain": "límites_y_scoring",
+      "statement": "La confianza es un puntaje observable, no una opinión: se compone de puntualidad, volumen, antigüedad y referencias del broker.",
+      "source": "Sección 8.4"
+    },
+    {
+      "id": "BR-LIM-04",
+      "domain": "límites_y_scoring",
+      "statement": "Todo cambio de límite requiere un motivo registrado, queda auditado con el valor anterior y el nuevo, y respeta el tope global.",
+      "source": "Sección 8.4"
+    },
+    {
+      "id": "BR-LIM-05",
+      "domain": "límites_y_scoring",
+      "statement": "El broker propone y ajusta límites dentro de los topes; el operador puede ajustarlos y define los parámetros globales.",
+      "source": "Secciones 7.1 y 8.4"
+    },
+    {
+      "id": "BR-DEL-01",
+      "domain": "mora",
+      "statement": "Un miembro entra en mora cuando su saldo es negativo y venció la fecha de deuda más el plazo de saldado vigente.",
+      "source": "Secciones 5 y 7.1"
+    },
+    {
+      "id": "BR-DEL-02",
+      "domain": "mora",
+      "statement": "Un miembro en mora, suspendido o castigado no puede iniciar pagos.",
+      "source": "Invariante 4"
+    },
+    {
+      "id": "BR-DEL-03",
+      "domain": "mora",
+      "statement": "El sistema avisa al miembro antes del vencimiento de su deuda.",
+      "source": "Sección 8.5, recordatorios"
+    },
+    {
+      "id": "BR-DEL-04",
+      "domain": "mora",
+      "statement": "El castigo de una deuda solo procede después del período de gracia, lo ejecuta el operador con motivo registrado, mueve la deuda a la cuenta de deuda castigada y deja al miembro en estado incobrable.",
+      "source": "Secciones 5 y 7.1"
+    },
+    {
+      "id": "BR-DEL-05",
+      "domain": "mora",
+      "statement": "La penalidad por mora se calcula como un porcentaje fijo sobre el monto vencido y se destina al Fondo. El porcentaje no está definido en la fuente (G03).",
+      "source": "Sección 5"
+    },
+    {
+      "id": "BR-FUN-01",
+      "domain": "fondo_de_garantia",
+      "statement": "El Fondo de Garantía se denomina en USDC y lleva contabilidad separada del saldo de los miembros.",
+      "source": "D8"
+    },
+    {
+      "id": "BR-FUN-02",
+      "domain": "fondo_de_garantia",
+      "statement": "Los aportes de inversores tienen plazo de 30, 90 o 180 días y solo pueden retirarse al vencimiento.",
+      "source": "Sección 5 y 7.2"
+    },
+    {
+      "id": "BR-FUN-03",
+      "domain": "fondo_de_garantia",
+      "statement": "Si la liquidez libre no alcanza, la solicitud de retiro espera en una cola por orden de llegada que el proceso automático atiende a medida que hay liquidez.",
+      "source": "Sección 7.2"
+    },
+    {
+      "id": "BR-FUN-04",
+      "domain": "fondo_de_garantia",
+      "statement": "Nunca se compromete en coberturas más que los activos menos la reserva mínima de liquidez del 15%.",
+      "source": "Sección 5 y 7.2"
+    },
+    {
+      "id": "BR-FUN-05",
+      "domain": "fondo_de_garantia",
+      "statement": "Los únicos ingresos del Fondo son cuotas de membresía, penalidades por mora y recuperos. No se cobran intereses a los miembros.",
+      "source": "D2"
+    },
+    {
+      "id": "BR-FUN-06",
+      "domain": "fondo_de_garantia",
+      "statement": "Ante un castigo, la cobertura al acreedor sigue el mecanismo que se apruebe en O4, con tope por período y factor de recupero menor a 1. La recomendación provisoria es que el Fondo pague al acreedor y se extinga el crédito equivalente.",
+      "source": "Sección 7.2; O4"
+    },
+    {
+      "id": "BR-FUN-07",
+      "domain": "fondo_de_garantia",
+      "statement": "El valor de la participación del inversor solo baja por una compensación y solo sube por el ingreso de cuotas, penalidades o recuperos.",
+      "source": "Invariante 3 del Fondo"
+    },
+    {
+      "id": "BR-FUN-08",
+      "domain": "fondo_de_garantia",
+      "statement": "La suma de retiros procesados nunca excede los activos del Fondo.",
+      "source": "Invariante 4 del Fondo"
+    },
+    {
+      "id": "BR-FUN-09",
+      "domain": "fondo_de_garantia",
+      "statement": "Existe un tope de aporte por inversor, configurable, para limitar el riesgo en la fase piloto.",
+      "source": "Sección 5"
+    },
+    {
+      "id": "BR-MEM-01",
+      "domain": "membresia",
+      "statement": "La cuota de membresía es escalonada por tamaño del miembro y se registra como ingreso del Fondo. Su medio de cobro está abierto en O3.",
+      "source": "Sección 5; O3"
+    },
+    {
+      "id": "BR-MEM-02",
+      "domain": "membresia",
+      "statement": "El alta exige verificación por broker de los datos del comercio o prestador: identificación fiscal, rubro y dirección.",
+      "source": "Sección 8.1, verificación liviana"
+    },
+    {
+      "id": "BR-MEM-03",
+      "domain": "membresia",
+      "statement": "Los datos personales no se exponen en el registro auditable del circuito; el registro solo contiene referencias opacas. El alcance de visibilidad depende de O5.",
+      "source": "Sección 6 y O5"
+    },
+    {
+      "id": "BR-SEC-01",
+      "domain": "seguridad",
+      "statement": "Antes de confirmar un pago se exige el segundo factor vigente según O7.",
+      "source": "Sección 8.3"
+    },
+    {
+      "id": "BR-SEC-02",
+      "domain": "seguridad",
+      "statement": "Tras cinco intentos fallidos de confirmación se bloquea temporalmente la cuenta y el dispositivo.",
+      "source": "Sección 8.3"
+    },
+    {
+      "id": "BR-SEC-03",
+      "domain": "seguridad",
+      "statement": "Toda acción administrativa queda auditada con quién, qué, cuándo y los valores anterior y nuevo.",
+      "source": "Sección 8.3"
+    },
+    {
+      "id": "BR-SEC-04",
+      "domain": "seguridad",
+      "statement": "El guardián puede pausar el circuito ante una emergencia. Durante la pausa no se aceptan pagos nuevos y el estado se muestra a los miembros.",
+      "source": "Sección 7.1 y 11"
+    }
+  ],
+  "use_cases": [
+    {
+      "id": "UC-01",
+      "title": "Alta de miembro",
+      "actors": ["A04", "A01", "A02", "A03"],
+      "goal": "Incorporar un comercio, prestador o consumidor a la red en estado pendiente.",
+      "preconditions": ["El broker identifica a la persona o comercio."],
+      "main_flow": [
+        "El broker inicia el alta y registra los datos del miembro: identificación fiscal, rubro, dirección y contacto.",
+        "El broker verifica la información declarada y deja constancia del tipo de miembro.",
+        "El sistema crea al miembro en estado pendiente y le habilita el acceso a la app.",
+        "El miembro recibe sus credenciales de acceso por el canal de notificación vigente."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "Los datos no pueden verificarse",
+          "outcome": "El alta no se completa y queda registrada la causa."
+        }
+      ],
+      "postconditions": ["El miembro existe en estado pendiente y no puede operar."],
+      "business_rules": ["BR-MEM-02", "BR-MEM-03"],
+      "related_open_questions": ["O7", "O9"]
+    },
+    {
+      "id": "UC-02",
+      "title": "Activación con límites",
+      "actors": ["A04"],
+      "goal": "Habilitar al miembro para operar con un límite de crédito y un tope positivo.",
+      "preconditions": ["El miembro está pendiente.", "Existe una propuesta de límite basada en scoring o en la evaluación del broker."],
+      "main_flow": [
+        "El broker revisa la propuesta de límite y el nivel de confianza asignado.",
+        "El broker confirma el límite, que no puede superar el tope global.",
+        "El sistema activa al miembro y registra el motivo del límite asignado.",
+        "El miembro ve en su inicio el límite, el disponible y la fecha de vencimiento de su deuda cuando corresponda."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El límite propuesto supera el tope global",
+          "outcome": "El sistema lo rechaza y muestra el máximo permitido."
+        }
+      ],
+      "postconditions": ["El miembro está activo y puede pagar y cobrar."],
+      "business_rules": ["BR-LIM-01", "BR-LIM-04", "BR-LIM-05"],
+      "related_open_questions": ["O1"]
+    },
+    {
+      "id": "UC-03",
+      "title": "Ajuste de límite o de estado",
+      "actors": ["A04", "A05"],
+      "goal": "Modificar el límite, suspender o reactivar a un miembro dejando rastro auditable.",
+      "preconditions": ["El miembro existe."],
+      "main_flow": [
+        "El broker u operador elige al miembro y la acción: ajustar límite, suspender o reactivar.",
+        "Registra el motivo de la acción.",
+        "El sistema aplica el cambio y lo deja auditado con el valor anterior y el nuevo.",
+        "El miembro ve su nuevo estado o límite en la app."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El miembro tiene un pago en curso",
+          "outcome": "El cambio aplica a partir de la siguiente operación, sin alterar el pago ya confirmado."
+        }
+      ],
+      "postconditions": ["El cambio queda aplicado y auditado."],
+      "business_rules": ["BR-LIM-04", "BR-LIM-05", "BR-SEC-03"],
+      "related_open_questions": []
+    },
+    {
+      "id": "UC-04",
+      "title": "Pago a otro miembro",
+      "actors": ["A01", "A02", "A03"],
+      "goal": "Transferir unidades del propio saldo a otro miembro de la red.",
+      "preconditions": ["El emisor está activo y no está en mora.", "El receptor está identificado."],
+      "main_flow": [
+        "El emisor elige destinatario por QR o por búsqueda en el directorio.",
+        "Ingresa el monto y, opcionalmente, una referencia.",
+        "El sistema muestra un resumen con el impacto en su saldo y el disponible restante.",
+        "El emisor confirma con el segundo factor vigente.",
+        "El sistema registra el pago, actualiza ambos saldos y muestra un recibo."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El pago supera el límite del emisor",
+          "outcome": "Se rechaza y se informa cuánto excede el disponible."
+        },
+        {
+          "condition": "El receptor está en su tope positivo",
+          "outcome": "Se rechaza y se informa al emisor que el receptor no puede recibir más saldo."
+        },
+        {
+          "condition": "El emisor o el receptor no están activos",
+          "outcome": "Se rechaza con el motivo del estado del miembro."
+        },
+        {
+          "condition": "La confirmación falla o vence",
+          "outcome": "El pago no se registra y se ofrece reintentar."
+        },
+        {
+          "condition": "La conexión se corta durante el envío",
+          "outcome": "Al reintentar, el miembro ve el mismo pago confirmado una sola vez o el error, sin duplicados."
+        }
+      ],
+      "postconditions": ["El saldo del emisor baja y el del receptor sube por el mismo monto.", "La suma agregada sigue siendo cero.", "Existe un recibo consultable."],
+      "business_rules": ["BR-ACC-01", "BR-ACC-02", "BR-PAY-01", "BR-PAY-02", "BR-PAY-03", "BR-PAY-04", "BR-PAY-05", "BR-PAY-06", "BR-PAY-08", "BR-SEC-01"],
+      "related_open_questions": ["O1", "O7"]
+    },
+    {
+      "id": "UC-05",
+      "title": "Cobro con QR",
+      "actors": ["A01", "A02"],
+      "goal": "Cobrar en la red mostrando un QR estático o un QR con monto.",
+      "preconditions": ["El comercio o prestador está activo."],
+      "main_flow": [
+        "El comercio muestra su QR desde la app.",
+        "El comprador escanea el QR o ingresa el monto si el QR es estático.",
+        "El comprador confirma el pago.",
+        "El comercio recibe el aviso de cobro y ve el movimiento en su historial."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El QR corresponde a un miembro inactivo",
+          "outcome": "El sistema avisa que ese miembro no puede recibir pagos en este momento."
+        }
+      ],
+      "postconditions": ["El cobro queda registrado y visible para ambas partes."],
+      "business_rules": ["BR-PAY-01", "BR-PAY-04", "BR-PAY-06"],
+      "related_open_questions": []
+    },
+    {
+      "id": "UC-06",
+      "title": "Explorar el directorio",
+      "actors": ["A01", "A02", "A03"],
+      "goal": "Encontrar a quién comprar dentro de la red.",
+      "preconditions": ["El miembro inició sesión."],
+      "main_flow": [
+        "El miembro busca por nombre o filtra por rubro.",
+        "Ve qué ofrece cada miembro y su estado de disponibilidad para recibir pagos.",
+        "Selecciona un miembro para iniciar un pago."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "No hay resultados",
+          "outcome": "Se muestra un mensaje claro y la sugerencia de probar otro rubro o nombre."
+        }
+      ],
+      "postconditions": ["El miembro puede iniciar un pago desde el directorio."],
+      "business_rules": ["BR-ACC-03"],
+      "related_open_questions": ["O5"]
+    },
+    {
+      "id": "UC-07",
+      "title": "Consulta de estado financiero",
+      "actors": ["A01", "A02", "A03"],
+      "goal": "Saber cuánto se debe, cuánto se puede gastar y cuándo vence la deuda.",
+      "preconditions": ["El miembro inició sesión."],
+      "main_flow": [
+        "El miembro abre el inicio de la app.",
+        "Ve saldo, límite, disponible y, si corresponde, monto de deuda y días restantes para el vencimiento.",
+        "Ve también su nivel de confianza cuando el producto lo exponga."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El miembro está en mora",
+          "outcome": "Se muestra el estado de mora y qué acciones puede tomar para regularizar."
+        }
+      ],
+      "postconditions": ["El miembro conoce su situación y su capacidad de gasto."],
+      "business_rules": ["BR-ACC-02", "BR-ACC-04", "BR-DEL-01"],
+      "related_open_questions": ["O1", "O2"]
+    },
+    {
+      "id": "UC-08",
+      "title": "Historial y recibo",
+      "actors": ["A01", "A02", "A03", "A06"],
+      "goal": "Revisar movimientos pasados y comprobar un pago.",
+      "preconditions": ["El usuario inició sesión."],
+      "main_flow": [
+        "El usuario abre el historial.",
+        "Ve movimientos con fecha, contraparte, monto y referencia.",
+        "Abre un movimiento y ve el recibo, con la opción de verificación cuando exista."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El movimiento no pertenece al usuario",
+          "outcome": "No se muestra información de terceros."
+        }
+      ],
+      "postconditions": ["El usuario puede acreditar la operación."],
+      "business_rules": ["BR-ACC-03", "BR-MEM-03"],
+      "related_open_questions": ["O5"]
+    },
+    {
+      "id": "UC-09",
+      "title": "Suspensión y reactivación",
+      "actors": ["A04", "A05"],
+      "goal": "Bloquear temporalmente a un miembro y volver a habilitarlo.",
+      "preconditions": ["El miembro está activo o suspendido."],
+      "main_flow": [
+        "El broker u operador suspende al miembro indicando el motivo.",
+        "El miembro deja de poder iniciar y recibir pagos.",
+        "Al reactivar, se registra el motivo y el miembro vuelve a operar con sus límites vigentes."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El miembro tiene deuda pendiente",
+          "outcome": "La reactivación no extingue la deuda ni reinicia su vencimiento."
+        }
+      ],
+      "postconditions": ["El estado del miembro y su historial reflejan la decisión."],
+      "business_rules": ["BR-DEL-02", "BR-SEC-03"],
+      "related_open_questions": ["G02"]
+    },
+    {
+      "id": "UC-10",
+      "title": "Detección y aviso de mora",
+      "actors": ["A08", "A05", "A01", "A02", "A03"],
+      "goal": "Marcar como moroso a un miembro vencido y avisarle.",
+      "preconditions": ["El miembro tiene saldo negativo y venció su plazo de saldado."],
+      "main_flow": [
+        "El proceso automático identifica a los miembros vencidos.",
+        "Los marca en mora y bloquea su capacidad de iniciar pagos.",
+        "Envía el aviso al miembro con el monto vencido y las opciones para regularizar.",
+        "Deja registro de la marca y del aviso."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El miembro salda antes del vencimiento",
+          "outcome": "No se marca la mora."
+        }
+      ],
+      "postconditions": ["El miembro figura en mora y no puede pagar."],
+      "business_rules": ["BR-DEL-01", "BR-DEL-02", "BR-DEL-03", "BR-ACC-04"],
+      "related_open_questions": ["O6", "G02"]
+    },
+    {
+      "id": "UC-11",
+      "title": "Castigo de deuda incobrable",
+      "actors": ["A05"],
+      "goal": "Registrar como pérdida una deuda que no se recuperó.",
+      "preconditions": ["El miembro está en mora.", "Transcurrió el período de gracia."],
+      "main_flow": [
+        "El operador revisa el caso y confirma el castigo con un motivo.",
+        "El sistema mueve la deuda a la cuenta de deuda castigada y deja al miembro en estado incobrable.",
+        "El hecho queda auditado y visible en el estado del miembro."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "No transcurrió la gracia",
+          "outcome": "El castigo no se permite y se informa la fecha mínima."
+        }
+      ],
+      "postconditions": ["La deuda castigada queda registrada y la suma agregada sigue en cero."],
+      "business_rules": ["BR-DEL-04", "BR-ACC-01", "BR-SEC-03"],
+      "related_open_questions": ["O4"]
+    },
+    {
+      "id": "UC-12",
+      "title": "Compensación al acreedor",
+      "actors": ["A05", "A06"],
+      "goal": "Cubrir al acreedor de un miembro castigado según el mecanismo aprobado.",
+      "preconditions": ["Existe una deuda castigada.", "El Fondo tiene liquidez y no superó su tope de cobertura del período."],
+      "main_flow": [
+        "El operador inicia la compensación indicando acreedor y monto.",
+        "El sistema verifica el tope por período y el factor de recupero.",
+        "Aplica la cobertura y extingue el crédito equivalente.",
+        "Actualiza el valor de la participación del Fondo y notifica al acreedor."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El tope del período ya se alcanzó",
+          "outcome": "La compensación queda pendiente y se informa la causa."
+        },
+        {
+          "condition": "El Fondo no tiene liquidez suficiente",
+          "outcome": "La compensación no se ejecuta y queda registrada como pendiente."
+        }
+      ],
+      "postconditions": ["El acreedor recibe la cobertura y el Fondo refleja la pérdida."],
+      "business_rules": ["BR-FUN-04", "BR-FUN-06", "BR-FUN-07", "BR-ACC-01"],
+      "related_open_questions": ["O4", "G04"]
+    },
+    {
+      "id": "UC-13",
+      "title": "Aporte de inversor",
+      "actors": ["A06"],
+      "goal": "Aportar USDC al Fondo de Garantía con un plazo.",
+      "preconditions": ["El inversor está habilitado y aceptó las advertencias de riesgo."],
+      "main_flow": [
+        "El inversor elige monto y plazo de 30, 90 o 180 días.",
+        "Ve el valor de la participación y la fecha de disponibilidad.",
+        "Confirma el aporte.",
+        "El sistema registra la posición y la muestra en su vista."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El aporte supera el tope por inversor",
+          "outcome": "Se rechaza y se informa el máximo permitido."
+        }
+      ],
+      "postconditions": ["El inversor tiene una posición con vencimiento."],
+      "business_rules": ["BR-FUN-01", "BR-FUN-02", "BR-FUN-09"],
+      "related_open_questions": ["O3", "O8"]
+    },
+    {
+      "id": "UC-14",
+      "title": "Retiro de inversor",
+      "actors": ["A06", "A08"],
+      "goal": "Retirar el aporte al vencimiento o esperar en cola.",
+      "preconditions": ["La posición alcanzó su fecha de disponibilidad."],
+      "main_flow": [
+        "El inversor solicita el retiro de su posición.",
+        "Si hay liquidez libre suficiente, el retiro se procesa.",
+        "Si no hay liquidez, la solicitud entra en la cola por orden de llegada y el proceso automático la atiende cuando hay fondos.",
+        "El inversor ve el estado de su solicitud."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "La posición no venció",
+          "outcome": "La solicitud se rechaza y se informa la fecha disponible."
+        },
+        {
+          "condition": "Se alcanzó el límite de la reserva mínima",
+          "outcome": "El retiro espera en cola."
+        }
+      ],
+      "postconditions": ["El retiro se completa o queda en cola visible para el inversor."],
+      "business_rules": ["BR-FUN-02", "BR-FUN-03", "BR-FUN-04", "BR-FUN-08"],
+      "related_open_questions": []
+    },
+    {
+      "id": "UC-15",
+      "title": "Registro de ingresos del Fondo",
+      "actors": ["A05"],
+      "goal": "Acreditar al Fondo los ingresos por cuotas, penalidades y recuperos.",
+      "preconditions": ["Existe un cobro o una penalidad registrada."],
+      "main_flow": [
+        "El operador registra el ingreso indicando monto y origen.",
+        "El sistema lo acredita al Fondo y actualiza el valor de la participación.",
+        "El movimiento queda auditado y visible para los inversores."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El origen no es cuota, penalidad o recupero",
+          "outcome": "El registro se rechaza."
+        }
+      ],
+      "postconditions": ["El ingreso queda reflejado en el Fondo."],
+      "business_rules": ["BR-FUN-05", "BR-FUN-07", "BR-SEC-03"],
+      "related_open_questions": ["O3"]
+    },
+    {
+      "id": "UC-16",
+      "title": "Cobro de cuota de membresía",
+      "actors": ["A05", "A01", "A02", "A03"],
+      "goal": "Cobrar la cuota mensual escalonada y registrarla como ingreso.",
+      "preconditions": ["El miembro está activo.", "Corresponde el período mensual."],
+      "main_flow": [
+        "El proceso automático emite la cuota según el tamaño del miembro.",
+        "El miembro ve el monto y el vencimiento de su cuota.",
+        "El cobro se realiza por el medio que defina O3.",
+        "El operador registra el ingreso correspondiente."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "La cuota no se paga",
+          "outcome": "Queda registrada como pendiente y se notifica al miembro."
+        }
+      ],
+      "postconditions": ["La cuota del período queda emitida y, si se cobró, acreditada."],
+      "business_rules": ["BR-MEM-01", "BR-FUN-05"],
+      "related_open_questions": ["O3"]
+    },
+    {
+      "id": "UC-17",
+      "title": "Vista de inversor",
+      "actors": ["A06"],
+      "goal": "Entender el estado del Fondo y la propia posición.",
+      "preconditions": ["El inversor inició sesión."],
+      "main_flow": [
+        "El inversor ve el valor de la participación, la liquidez, el nivel de compromiso y sus posiciones.",
+        "Ve los ingresos acumulados del Fondo y las advertencias de riesgo.",
+        "Ve el estado de sus solicitudes de retiro."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El Fondo está en pérdida",
+          "outcome": "Se muestra la variación y se explica que afecta a todas las participaciones."
+        }
+      ],
+      "postconditions": ["El inversor conoce su exposición y liquidez."],
+      "business_rules": ["BR-FUN-07", "BR-FUN-08"],
+      "related_open_questions": ["O4", "O8"]
+    },
+    {
+      "id": "UC-18",
+      "title": "Pausa de emergencia",
+      "actors": ["A07", "A05", "A01", "A02", "A03"],
+      "goal": "Detener la operatoria ante un incidente.",
+      "preconditions": ["Se detectó una emergencia."],
+      "main_flow": [
+        "El guardián activa la pausa.",
+        "El sistema deja de aceptar pagos nuevos y mantiene intactos los saldos.",
+        "La app informa el estado de pausa a los miembros.",
+        "Al reanudar, se registra quién reanudó y cuándo."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "Se intenta pagar durante la pausa",
+          "outcome": "El pago se rechaza con un mensaje de mantenimiento."
+        }
+      ],
+      "postconditions": ["El circuito queda pausado o reanudado, con registro del hecho."],
+      "business_rules": ["BR-SEC-04", "BR-SEC-03"],
+      "related_open_questions": ["O8"]
+    },
+    {
+      "id": "UC-19",
+      "title": "Parámetros y auditoría",
+      "actors": ["A05"],
+      "goal": "Cambiar parámetros del circuito y revisar acciones administrativas.",
+      "preconditions": ["El operador inició sesión en la consola."],
+      "main_flow": [
+        "El operador consulta o modifica un parámetro dentro de rangos permitidos.",
+        "El sistema registra el cambio con valor anterior y nuevo.",
+        "El operador consulta la auditoría filtrada por tipo de acción o por miembro."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "El valor está fuera de rango",
+          "outcome": "El sistema lo rechaza y muestra el rango válido."
+        }
+      ],
+      "postconditions": ["Los parámetros vigentes y su historial son consultables."],
+      "business_rules": ["BR-LIM-04", "BR-SEC-03", "BR-ACC-05"],
+      "related_open_questions": ["O1", "O2", "O4"]
+    },
+    {
+      "id": "UC-20",
+      "title": "Simulación y calibración",
+      "actors": ["A05"],
+      "goal": "Evaluar escenarios antes de fijar parámetros del piloto.",
+      "preconditions": ["Existen datos de prueba o parámetros candidatos."],
+      "main_flow": [
+        "El operador define un escenario normal, de estrés o de incumplimiento.",
+        "El sistema calcula el efecto sobre circulación, mora y Fondo.",
+        "El resultado queda etiquetado como simulado y sirve de insumo para decidir parámetros."
+      ],
+      "alternative_flows": [
+        {
+          "condition": "Faltan datos de entrada",
+          "outcome": "El escenario no se ejecuta y se indican los datos faltantes."
+        }
+      ],
+      "postconditions": ["Existe un resultado de simulación trazable para la decisión."],
+      "business_rules": ["BR-ACC-05"],
+      "related_open_questions": ["O1", "O2", "O4"]
+    }
+  ],
+  "user_journeys": [
+    {
+      "id": "J01",
+      "name": "Primer circuito: alta, pago y cobro",
+      "persona": "Comercio y consumidor nuevos",
+      "steps": [
+        "El broker da de alta al comercio y al consumidor (UC-01).",
+        "El broker activa al comercio con un límite acorde a su facturación y al consumidor con un límite bajo (UC-02).",
+        "El consumidor explora el directorio y encuentra al comercio (UC-06).",
+        "El consumidor paga escaneando el QR del comercio (UC-04, UC-05).",
+        "Ambos ven el movimiento y el recibo (UC-08).",
+        "El comercio usa el saldo recibido para comprar a un prestador de la red, cerrando el circuito."
+      ],
+      "success_signal": "Un usuario no técnico completa alta, pago y cobro sin ayuda."
+    },
+    {
+      "id": "J02",
+      "name": "Deuda que no se salda",
+      "persona": "Comercio que compró a crédito",
+      "steps": [
+        "El comercio compra y su saldo queda negativo (UC-04).",
+        "Ve el monto de deuda y los días restantes en su inicio (UC-07).",
+        "Recibe recordatorios antes del vencimiento (UC-10).",
+        "Al vencer el plazo, queda en mora y se le bloquean nuevos pagos (UC-10).",
+        "Si no regulariza tras la gracia, el operador castiga la deuda (UC-11).",
+        "El acreedor puede ser compensado con el Fondo según el mecanismo aprobado (UC-12)."
+      ],
+      "success_signal": "La mora y el castigo son visibles, auditables y no rompen la suma cero."
+    },
+    {
+      "id": "J03",
+      "name": "Inversor de impacto",
+      "persona": "Inversor que aporta al Fondo",
+      "steps": [
+        "Conoce el Fondo y acepta las advertencias de riesgo (UC-17).",
+        "Aporta con un plazo de 90 días (UC-13).",
+        "Ve cómo los ingresos por cuotas y penalidades suben el valor de su participación (UC-15, UC-17).",
+        "Al vencer solicita el retiro; si no hay liquidez, espera en cola y ve su posición en la fila (UC-14)."
+      ],
+      "success_signal": "El inversor entiende plazo, riesgo y liquidez sin depender de un operador humano."
+    },
+    {
+      "id": "J04",
+      "name": "Día del broker",
+      "persona": "Broker de la red",
+      "steps": [
+        "Revisa altas pendientes y verifica datos (UC-01).",
+        "Propone límites dentro del tope global y los justifica (UC-02, UC-03).",
+        "Suspende a un miembro con problemas y lo reactiva cuando corresponde (UC-09).",
+        "Consulta el estado de sus miembros y el historial de sus decisiones."
+      ],
+      "success_signal": "El broker opera sin acceso a funciones financieras reservadas al operador."
+    },
+    {
+      "id": "J05",
+      "name": "Incidente en el circuito",
+      "persona": "Guardián y operador",
+      "steps": [
+        "Se detecta una anomalía en pagos o saldos.",
+        "El guardián pausa el circuito (UC-18).",
+        "Los miembros ven el estado de pausa y no pueden iniciar pagos.",
+        "El operador revisa la auditoría (UC-19) y, resuelto el incidente, se reanuda."
+      ],
+      "success_signal": "Ningún saldo se altera durante la pausa y toda acción queda registrada."
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "title": "Alta deja al miembro pendiente e inoperante",
+      "given": "un broker con acceso a la consola y una persona que quiere ingresar a la red",
+      "when": "el broker completa el alta con los datos verificados",
+      "then": "el miembro queda en estado pendiente, no puede pagar ni cobrar, y el alta queda registrada con el broker que la hizo",
+      "traces_to": ["S03", "S04", "UC-01", "BR-MEM-02"]
+    },
+    {
+      "id": "AC-02",
+      "title": "Activación con límite dentro del tope global",
+      "given": "un miembro pendiente y un tope global de crédito vigente",
+      "when": "el broker lo activa con un límite y un tope positivo",
+      "then": "el miembro pasa a activo, el límite nunca supera el tope global y el cambio queda auditado con su motivo",
+      "traces_to": ["S05", "UC-02", "BR-LIM-04", "BR-LIM-05"]
+    },
+    {
+      "id": "AC-03",
+      "title": "Pago válido mueve los dos saldos y conserva la suma cero",
+      "given": "un emisor activo con disponible suficiente y un receptor activo con espacio en su tope positivo",
+      "when": "el emisor confirma un pago por un monto válido",
+      "then": "el saldo del emisor baja y el del receptor sube por el mismo monto, la suma de todos los saldos sigue siendo cero y ambos ven el recibo",
+      "traces_to": ["S01", "S02", "S07", "UC-04", "BR-ACC-01", "BR-PAY-06"]
+    },
+    {
+      "id": "AC-04",
+      "title": "Pago en el límite exacto",
+      "given": "un emisor cuyo disponible es exactamente el monto a pagar",
+      "when": "confirma el pago",
+      "then": "el pago se acepta y su saldo queda exactamente en el límite negativo permitido",
+      "traces_to": ["S05", "UC-04", "BR-PAY-03"]
+    },
+    {
+      "id": "AC-05",
+      "title": "Pago que excede el límite se rechaza con el excedente",
+      "given": "un emisor con disponible menor al monto ingresado",
+      "when": "intenta confirmar el pago",
+      "then": "el pago no se registra y el mensaje indica cuánto supera su disponible",
+      "traces_to": ["S05", "UC-04", "BR-PAY-03"]
+    },
+    {
+      "id": "AC-06",
+      "title": "Receptor en su tope positivo",
+      "given": "un receptor cuyo saldo más el monto superaría su tope positivo",
+      "when": "el emisor intenta pagarle",
+      "then": "el pago se rechaza y el emisor entiende que el receptor no puede recibir más saldo en este momento",
+      "traces_to": ["S05", "UC-04", "BR-PAY-04"]
+    },
+    {
+      "id": "AC-07",
+      "title": "Estados que impiden pagar",
+      "given": "un emisor en mora, suspendido, castigado o pendiente",
+      "when": "intenta iniciar un pago",
+      "then": "la acción no está disponible y se explica el estado que lo impide",
+      "traces_to": ["S04", "S10", "UC-04", "UC-09", "BR-PAY-01", "BR-DEL-02"]
+    },
+    {
+      "id": "AC-08",
+      "title": "Monto inválido",
+      "given": "un emisor activo",
+      "when": "ingresa un monto igual a cero o negativo",
+      "then": "el pago no se inicia y se muestra un error de monto inválido",
+      "traces_to": ["UC-04", "BR-PAY-02"]
+    },
+    {
+      "id": "AC-09",
+      "title": "Cruce de cero y reloj de deuda",
+      "given": "un miembro con saldo positivo o cero",
+      "when": "un pago lo deja con saldo negativo",
+      "then": "se registra la fecha de inicio de deuda; cuando vuelve a cero o positivo, la deuda deja de figurar como activa",
+      "traces_to": ["S10", "UC-04", "UC-07", "BR-ACC-04"]
+    },
+    {
+      "id": "AC-10",
+      "title": "Mora al vencer el plazo",
+      "given": "un miembro con saldo negativo cuyo plazo de saldado venció",
+      "when": "corre la detección diaria de mora",
+      "then": "el miembro pasa a estado en mora, no puede iniciar pagos y el hecho queda registrado",
+      "traces_to": ["S10", "UC-10", "BR-DEL-01"]
+    },
+    {
+      "id": "AC-11",
+      "title": "Aviso antes del vencimiento",
+      "given": "un miembro con deuda próxima a vencer",
+      "when": "se ejecutan los recordatorios",
+      "then": "el miembro recibe un aviso con monto y fecha de vencimiento por email o push",
+      "traces_to": ["S10", "S17", "UC-10", "BR-DEL-03"]
+    },
+    {
+      "id": "AC-12",
+      "title": "Castigo solo después de la gracia",
+      "given": "un miembro en mora",
+      "when": "el operador intenta castigar la deuda antes de que termine el período de gracia",
+      "then": "el sistema lo impide e informa la fecha mínima; después de la gracia, el castigo se registra, deja al miembro incobrable y la suma de saldos sigue en cero",
+      "traces_to": ["S11", "UC-11", "BR-DEL-04", "BR-ACC-01"]
+    },
+    {
+      "id": "AC-13",
+      "title": "Compensación con tope y efecto en el inversor",
+      "given": "una deuda castigada y un Fondo con liquidez",
+      "when": "el operador compensa al acreedor",
+      "then": "el acreedor recibe la cobertura, se extingue el crédito equivalente, la operación respeta el tope del período y el valor de la participación baja para todos los inversores",
+      "traces_to": ["S12", "UC-12", "BR-FUN-04", "BR-FUN-06", "BR-FUN-07"]
+    },
+    {
+      "id": "AC-14",
+      "title": "Solo cuotas, penalidades y recuperos alimentan el Fondo",
+      "given": "un operador que registra un ingreso",
+      "when": "el origen declarado no es cuota de membresía, penalidad por mora o recupero",
+      "then": "el ingreso se rechaza y el valor de la participación no cambia",
+      "traces_to": ["S12", "S13", "UC-15", "BR-FUN-05"]
+    },
+    {
+      "id": "AC-15",
+      "title": "Retiro antes del vencimiento",
+      "given": "un inversor con una posición vigente",
+      "when": "solicita retirar antes de la fecha de disponibilidad",
+      "then": "la solicitud se rechaza y se le informa la fecha en que podrá retirar",
+      "traces_to": ["S12", "UC-14", "BR-FUN-02"]
+    },
+    {
+      "id": "AC-16",
+      "title": "Cola de retiros sin liquidez",
+      "given": "un Fondo sin liquidez libre suficiente y dos solicitudes de retiro vencidas",
+      "when": "el proceso automático procesa la cola",
+      "then": "los retiros se atienden por orden de llegada a medida que hay liquidez, el inversor ve su posición en la cola y la suma de retiros nunca excede los activos",
+      "traces_to": ["S12", "UC-14", "BR-FUN-03", "BR-FUN-08"]
+    },
+    {
+      "id": "AC-17",
+      "title": "No existe canje de saldo para miembros",
+      "given": "un miembro con saldo positivo en la app",
+      "when": "busca una acción para convertir su saldo en pesos o en USDC",
+      "then": "no existe ninguna acción de canje, retiro o conversión de saldo disponible para miembros",
+      "traces_to": ["X01", "S16", "D6"]
+    },
+    {
+      "id": "AC-18",
+      "title": "Scoring inicial y crecimiento por historial",
+      "given": "un miembro nuevo con facturación verificada y stock declarado",
+      "when": "el broker consulta la propuesta de límite",
+      "then": "el sistema propone un límite de T0 calculado con facturación y stock con descuento, y el límite puede crecer cuando el miembro acumula historial de saldado a tiempo",
+      "traces_to": ["S06", "UC-02", "BR-LIM-01", "BR-LIM-02", "BR-LIM-03"]
+    },
+    {
+      "id": "AC-19",
+      "title": "Confirmación obligatoria y bloqueo por intentos",
+      "given": "un miembro que inició un pago",
+      "when": "no completa la confirmación vigente o falla cinco veces",
+      "then": "el pago no se registra y la cuenta y el dispositivo quedan bloqueados temporalmente con un mensaje claro",
+      "traces_to": ["S16", "UC-04", "BR-PAY-06", "BR-SEC-01", "BR-SEC-02"]
+    },
+    {
+      "id": "AC-20",
+      "title": "Reintento sin duplicar",
+      "given": "un pago confirmado cuya respuesta no llegó por conexión inestable",
+      "when": "el miembro reintenta",
+      "then": "ve el mismo pago confirmado una sola vez o el error, y el saldo se movió una única vez",
+      "traces_to": ["S16", "S07", "UC-04", "BR-PAY-08"]
+    },
+    {
+      "id": "AC-21",
+      "title": "Pausa visible y sin pagos nuevos",
+      "given": "un circuito pausado por el guardián",
+      "when": "un miembro intenta pagar",
+      "then": "el pago se rechaza con un mensaje de mantenimiento, los saldos existentes no cambian y el estado de pausa es visible en la app",
+      "traces_to": ["S15", "UC-18", "BR-SEC-04"]
+    },
+    {
+      "id": "AC-22",
+      "title": "App web instalable en celular con conexión inestable",
+      "given": "un miembro con un celular básico y conexión intermitente",
+      "when": "instala la app web y completa su flujo principal",
+      "then": "puede iniciar sesión, ver saldo y deuda, pagar y cobrar sin instalar una app nativa y sin vocabulario técnico",
+      "traces_to": ["S16", "X06", "D5", "UC-04", "UC-07"]
+    },
+    {
+      "id": "AC-23",
+      "title": "Errores accionables",
+      "given": "una operación rechazada por límite, estado o tope",
+      "when": "el sistema muestra el error",
+      "then": "el mensaje indica la causa concreta y qué puede hacer el miembro, sin códigos internos ni términos técnicos",
+      "traces_to": ["S16", "UC-04", "BR-PAY-03", "BR-PAY-04"]
+    },
+    {
+      "id": "AC-24",
+      "title": "Vista de inversor separada y con riesgo explícito",
+      "given": "un inversor que ingresa a la app",
+      "when": "abre el Fondo",
+      "then": "ve una vista claramente separada de la de miembro, con advertencias de riesgo, sus posiciones, plazos y el estado de sus retiros",
+      "traces_to": ["S12", "S16", "UC-17", "BR-FUN-07"]
+    },
+    {
+      "id": "AC-25",
+      "title": "Separación de funciones administrativas",
+      "given": "un broker con sesión en la consola",
+      "when": "intenta castigar una deuda o compensar a un acreedor",
+      "then": "la acción no está disponible para su rol y queda constancia del intento en la auditoría",
+      "traces_to": ["S14", "UC-11", "UC-12", "BR-SEC-03"]
+    },
+    {
+      "id": "AC-26",
+      "title": "Cada movimiento es auditable",
+      "given": "un pago, un cambio de límite o una acción administrativa",
+      "when": "el operador consulta la auditoría",
+      "then": "encuentra quién lo hizo, cuándo y los valores anterior y nuevo, sin datos personales expuestos en el registro público del circuito",
+      "traces_to": ["S02", "S14", "UC-19", "BR-ACC-03", "BR-MEM-03", "BR-SEC-03"]
+    }
+  ],
+  "ux_expectations": {
+    "principles": [
+      "Cero vocabulario técnico para miembros: el recibo puede ofrecer una verificación opcional, pero la experiencia no exige entenderla.",
+      "El estado de la deuda siempre visible: cuánto se debe, cuándo vence y cuánto se puede gastar.",
+      "Mensajes de error accionables que digan la causa y el siguiente paso.",
+      "Rápida en celulares básicos y tolerante a conexión inestable, con reintentos que no duplican operaciones.",
+      "La vista de inversor está claramente separada de la de miembro y declara el riesgo."
+    ],
+    "member": [
+      "Inicio con saldo, límite, disponible y, si aplica, deuda y días restantes.",
+      "Pago en pocos pasos: elegir destinatario por QR o directorio, monto, resumen y confirmación.",
+      "Recibo consultable y comprensible sin jerga financiera.",
+      "Historial legible con contraparte, monto, fecha y referencia."
+    ],
+    "merchant": [
+      "QR propio disponible en pantalla y compartible.",
+      "Panel con ventas del período, saldo frente al tope positivo y estado de deuda.",
+      "Aviso de cobro recibido en el momento."
+    ],
+    "investor": [
+      "Vista separada con valor de la participación, liquidez del Fondo, plazos y advertencias de riesgo.",
+      "Estado explícito de cada solicitud de retiro, incluyendo la posición en la cola.",
+      "Explicación de que las pérdidas por compensación afectan a todas las participaciones."
+    ],
+    "broker_operator_console": [
+      "Búsqueda de miembros por nombre, rubro y estado.",
+      "Alta guiada con verificación de datos y constancia del broker.",
+      "Cambio de límites con motivo obligatorio y previsualización del tope global.",
+      "Auditoría filtrable por miembro, tipo de acción y fecha."
+    ],
+    "notifications": [
+      "Email y push solamente; sin mensajería conversacional.",
+      "Avisos de vencimiento, mora, cuota emitida, cobro recibido y estado de retiro."
+    ],
+    "accessibility_and_resilience": [
+      "Contraste y tamaños legibles en pantallas pequeñas.",
+      "Operaciones críticas muestran progreso y permiten reintentar sin ambigüedad.",
+      "La app web es instalable y conserva la sesión de forma segura."
+    ]
+  },
+  "observable_errors_and_states": [
+    {
+      "id": "E01",
+      "situation": "El pago supera el límite del emisor",
+      "expected_experience": "Se rechaza antes de confirmar y se indica el excedente exacto y el disponible."
+    },
+    {
+      "id": "E02",
+      "situation": "El receptor está en su tope positivo",
+      "expected_experience": "Se rechaza y se explica que el receptor no puede recibir más saldo."
+    },
+    {
+      "id": "E03",
+      "situation": "El emisor está en mora, suspendido o castigado",
+      "expected_experience": "La acción de pagar no está disponible y se muestra el estado con el paso para regularizar cuando exista."
+    },
+    {
+      "id": "E04",
+      "situation": "Confirmación fallida o vencida",
+      "expected_experience": "El pago no se registra, no se descuenta saldo y se ofrece reintentar."
+    },
+    {
+      "id": "E05",
+      "situation": "Cinco intentos fallidos de confirmación",
+      "expected_experience": "Bloqueo temporal con mensaje claro y sin revelar datos sensibles."
+    },
+    {
+      "id": "E06",
+      "situation": "Circuito pausado",
+      "expected_experience": "Aviso de mantenimiento, pagos deshabilitados y saldos visibles sin cambios."
+    },
+    {
+      "id": "E07",
+      "situation": "Retiro de inversor sin liquidez",
+      "expected_experience": "La solicitud queda en cola y el inversor ve su posición y el motivo."
+    },
+    {
+      "id": "E08",
+      "situation": "Búsqueda en el directorio sin resultados",
+      "expected_experience": "Mensaje claro con sugerencia de cambiar el término o el rubro."
+    },
+    {
+      "id": "E09",
+      "situation": "Acción no permitida para el rol",
+      "expected_experience": "La opción no aparece o se rechaza con un mensaje de permisos, y el intento queda auditado."
+    }
+  ],
+  "security_and_privacy_expectations": [
+    "La confirmación de pagos exige un segundo factor según O7; el bloqueo por intentos es perceptible para el usuario.",
+    "Toda acción administrativa deja rastro auditable con actor, fecha y valores anterior y nuevo.",
+    "El registro auditable del circuito no expone datos personales, solo referencias opacas (O5).",
+    "El miembro puede ver sus propios movimientos; no puede ver los de terceros.",
+    "La captación de inversores y la custodia requieren revisión legal antes de operar con dinero real (O8)."
+  ],
+  "success_metrics_pilot": [
+    {
+      "metric": "Velocidad del dinero",
+      "definition": "Veces que una unidad cambia de manos por mes.",
+      "source": "Sección 14"
+    },
+    {
+      "metric": "Volumen y número de transacciones",
+      "definition": "Uso real de la red por período mensual.",
+      "source": "Sección 14"
+    },
+    {
+      "metric": "Densidad de red",
+      "definition": "Pares comprador-vendedor únicos sobre pares posibles.",
+      "source": "Sección 14"
+    },
+    {
+      "metric": "Miembros que gastan y reciben",
+      "definition": "Porcentaje de miembros que no son solo acreedores ni solo deudores.",
+      "source": "Sección 14"
+    },
+    {
+      "metric": "Deuda en mora sobre deuda total",
+      "definition": "Calidad de la cartera del circuito.",
+      "source": "Sección 14"
+    },
+    {
+      "metric": "Tiempo medio de saldado",
+      "definition": "Días promedio entre el inicio de la deuda y su cancelación.",
+      "source": "Sección 14"
+    },
+    {
+      "metric": "Utilización del Fondo y valor de la participación",
+      "definition": "Solvencia del respaldo y evolución del Fondo.",
+      "source": "Sección 14"
+    },
+    {
+      "metric": "Retención a 30 y 90 días",
+      "definition": "Miembros que siguen activos en la red.",
+      "source": "Sección 14"
+    },
+    {
+      "metric": "Advertencia sobre cifras simuladas",
+      "definition": "Cualquier cifra obtenida por simulación se presenta como simulada, nunca como medida.",
+      "source": "Sección 14"
+    }
+  ],
+  "traceability": [
+    {
+      "scope": "S01",
+      "use_cases": ["UC-04"],
+      "acceptance_criteria": ["AC-03", "AC-12"]
+    },
+    {
+      "scope": "S02",
+      "use_cases": ["UC-08", "UC-19"],
+      "acceptance_criteria": ["AC-03", "AC-26"]
+    },
+    {
+      "scope": "S03",
+      "use_cases": ["UC-01"],
+      "acceptance_criteria": ["AC-01"]
+    },
+    {
+      "scope": "S04",
+      "use_cases": ["UC-01", "UC-02", "UC-03", "UC-09", "UC-10", "UC-11"],
+      "acceptance_criteria": ["AC-01", "AC-07", "AC-10", "AC-12"]
+    },
+    {
+      "scope": "S05",
+      "use_cases": ["UC-02", "UC-03", "UC-04"],
+      "acceptance_criteria": ["AC-02", "AC-04", "AC-05", "AC-06"]
+    },
+    {
+      "scope": "S06",
+      "use_cases": ["UC-02", "UC-19"],
+      "acceptance_criteria": ["AC-18"]
+    },
+    {
+      "scope": "S07",
+      "use_cases": ["UC-04"],
+      "acceptance_criteria": ["AC-03", "AC-20"]
+    },
+    {
+      "scope": "S08",
+      "use_cases": ["UC-05"],
+      "acceptance_criteria": ["AC-03"]
+    },
+    {
+      "scope": "S09",
+      "use_cases": ["UC-06"],
+      "acceptance_criteria": ["AC-22"]
+    },
+    {
+      "scope": "S10",
+      "use_cases": ["UC-07", "UC-10"],
+      "acceptance_criteria": ["AC-09", "AC-10", "AC-11"]
+    },
+    {
+      "scope": "S11",
+      "use_cases": ["UC-11"],
+      "acceptance_criteria": ["AC-12"]
+    },
+    {
+      "scope": "S12",
+      "use_cases": ["UC-12", "UC-13", "UC-14", "UC-15", "UC-17"],
+      "acceptance_criteria": ["AC-13", "AC-14", "AC-15", "AC-16", "AC-24"]
+    },
+    {
+      "scope": "S13",
+      "use_cases": ["UC-15", "UC-16"],
+      "acceptance_criteria": ["AC-14"]
+    },
+    {
+      "scope": "S14",
+      "use_cases": ["UC-19"],
+      "acceptance_criteria": ["AC-25", "AC-26"]
+    },
+    {
+      "scope": "S15",
+      "use_cases": ["UC-18"],
+      "acceptance_criteria": ["AC-21"]
+    },
+    {
+      "scope": "S16",
+      "use_cases": ["UC-04", "UC-07", "UC-17"],
+      "acceptance_criteria": ["AC-17", "AC-19", "AC-22", "AC-23", "AC-24"]
+    },
+    {
+      "scope": "S17",
+      "use_cases": ["UC-10", "UC-16"],
+      "acceptance_criteria": ["AC-11"]
+    },
+    {
+      "scope": "S18",
+      "use_cases": ["UC-20"],
+      "acceptance_criteria": []
+    }
+  ],
+  "review_notes": {
+    "ready_for_approval": false,
+    "blocking_points": [
+      "O1 unidad de cuenta: todo monto y plazo depende de esta decisión.",
+      "O2 plazo de saldado: P01 es solo un valor inicial.",
+      "O3 moneda de la cuota de membresía: afecta UC-15 y UC-16.",
+      "O4 mecanismo de compensación: AC-13 describe la opción recomendada, no una decisión.",
+      "G01 política de reversión de pagos: hoy la spec no promete reversibilidad.",
+      "G03 valor de la penalidad por mora.",
+      "G04 equivalencia entre unidades y USDC para la compensación."
+    ],
+    "non_blocking_but_pending": [
+      "O5, O6, O7, O8 y O9 condicionan detalles de privacidad, mora, acceso y custodia, pero no el alcance del MVP.",
+      "G02 reincorporación y egreso con saldo distinto de cero.",
+      "G05 evidencia aceptada para verificar facturación y stock."
+    ],
+    "explicitly_excluded_from_this_spec": [
+      "D3 y D4 del documento fuente, por ser decisiones de implementación.",
+      "Colateral, transferencias externas, off-ramp para miembros, demurrage y WhatsApp: conceptos de un modelo anterior que no forman parte de esta spec."
+    ],
+    "next_step": "Aprobación explícita del usuario para avanzar a technical-spec.json."
+  }
+}
