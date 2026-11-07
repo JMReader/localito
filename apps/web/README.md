@@ -1,7 +1,11 @@
-# Localito web
+# PREStAR web
 
-Frontend de demo para la moneda local de Localito. Next.js (App Router) +
-TypeScript, mobile-first, sin dependencias de UI externas.
+Frontend de PREStAR: crédito mutuo en **PRt** sobre **Arbitrum One** (chain
+`42161`) y rampa 1:1 contra una reserva de **ARGt**. Next.js (App Router) +
+TypeScript + viem, mobile-first, sin librerías de UI externas.
+
+> El flujo anterior Localito/TL sobre SQLite quedó en `/legacy`, marcado como
+> sandbox. Sus balances no son PRt ni on-chain.
 
 ## Correr
 
@@ -12,12 +16,47 @@ npm install
 npm run dev
 ```
 
-Queda en `http://localhost:3000` y espera la API en
-`http://localhost:3001/api` (configurable con `NEXT_PUBLIC_API_URL`).
+Queda en `http://localhost:3000`. La API legacy (`NEXT_PUBLIC_API_URL`) sólo la
+usa `/legacy`.
 
-Si el backend corre en otra máquina o en un celular de la LAN, apuntá
-`NEXT_PUBLIC_API_URL` a `http://<IP>:3001/api` y arrancá la API con
-`HOST=0.0.0.0`.
+## Variables
+
+| variable | uso |
+|---|---|
+| `NEXT_PUBLIC_PRESTAR_CORE_ADDRESS` | address verificado de `PrestarCore`. **Vacío = contrato no desplegado**: la UI deshabilita todas las llamadas. No inventar. |
+| `NEXT_PUBLIC_PRESTAR_RPC_URL` | RPC HTTP de Arbitrum One (lectura de saldos, allowance y receipts). Vacío = RPC público. |
+| `NEXT_PUBLIC_ARGT_TOKEN_ADDRESS` | ARGt ERC-20 (18 decimales). Default `0x59863989d080B22476DB95656d0C3CC18be92214`. |
+| `NEXT_PUBLIC_API_URL` | API legacy del sandbox SQLite, usada sólo por `/legacy`. |
+
+No pongas claves privadas, mnemonics ni API keys de wallet en variables
+`NEXT_PUBLIC_*`: se exponen al navegador. PREStAR no guarda claves.
+
+## Qué muestra `PrestarCard`
+
+- Conexión MetaMask y red actual. Si no es `42161`, bloquea la firma y ofrece
+  cambiar a Arbitrum One.
+- `balanceOfMember(address)`: saldo PRt firmado (puede ser negativo por crédito).
+- `balanceOf` y `allowance` de ARGt en la wallet.
+- Estado `paused` del contrato.
+- Pago PRt a una dirección `0x…` visible (sin mapeo alias → wallet).
+- On-ramp ARGt → PRt: `approve` exacto + `onramp(cents)`.
+- Off-ramp PRt → ARGt: `offramp(cents)` contra la reserva limitada.
+- Estados de tx: firmando → enviando → confirmado/revertido, con hash a
+  Arbiscan.
+
+Montos: PRt se ingresa con hasta 2 decimales y se convierte a centavos con
+`parseUnits`. La conversión a ARGt es exacta:
+`argtRaw = prtCents * 10n ** 16n`. No se usan floats.
+
+## Seguridad de la UI
+
+- Sin `NEXT_PUBLIC_PRESTAR_CORE_ADDRESS` válida, muestra **"contrato aún no
+  desplegado"** y deshabilita todo. **No hay fallback** a `transfer` directo de
+  ARGt.
+- No firma si la wallet no está en Arbitrum One.
+- No pide ni guarda frase semilla.
+- No promete convertibilidad: el off-ramp puede revertir si la reserva no
+  alcanza.
 
 ## Scripts
 
@@ -28,14 +67,9 @@ Si el backend corre en otra máquina o en un celular de la LAN, apuntá
 | `npm run start` | sirve el build en el puerto 3000 |
 | `npm run typecheck` | `tsc --noEmit` |
 
-## Flujo cubierto
+## Legacy
 
-Login por alias de demo (`ana`, `bruno`, `kiosco`, `cafe`, `foto`), saldo y
-margen leídos de `GET /me`, búsqueda de participantes, pago con
-`Idempotency-Key` (una clave por intento, reutilizada al reintentar el mismo
-pago), recibo, historial con refresh manual y polling cada 20 s, stats de
-circuito y reset de demo.
-
-El token se guarda en `localStorage`. Ante un `401` se limpia la sesión y se
-vuelve al login. Los errores muestran `error.message`; los `details` nunca se
-imprimen crudos.
+`/legacy` conserva el login por alias (`ana`, `bruno`, `kiosco`, `cafe`, `foto`),
+pago con `Idempotency-Key`, recibo, historial y reset de demo sobre SQLite. Está
+etiquetado como **sandbox legacy / TL ≠ PRt**. No es fuente de verdad on-chain y
+no se conecta a `PrestarCore`.

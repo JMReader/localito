@@ -39,13 +39,13 @@ export default function LoginView({
         </header>
 
         <p className="login-lead">
-          La libreta del barrio. Entrá con un alias de demo para ver tu saldo,
-          pagar y cobrar.
+          Entrá con un alias para ver tu saldo, pagar y consultar el historial
+          del ledger de demo.
         </p>
 
         <p className="login-note">
-          Sin dinero real. Los saldos viven en un ledger local que podés
-          reiniciar cuando quieras.
+          Sin dinero real y sin blockchain. Los saldos viven en un ledger local
+          que podés reiniciar; no son fuente de verdad on-chain.
         </p>
 
         <div className="alias-grid" role="group" aria-label="Alias de demo">
@@ -103,19 +103,21 @@ export default function LoginView({
         ) : null}
 
         <footer className="login-foot">
-          <span>TL · 1 unidad = 1 ARS nominal</span>
-          <span>v0.1</span>
+          <span>TL · moneda local</span>
+          <a className="argt-link" href="/prestar">
+            Ir a PREStAR
+          </a>
         </footer>
       </section>
 
       <aside className="login-aside" aria-hidden="true">
-        <p className="login-aside-title">Una moneda que circula cerca.</p>
+        <p className="login-aside-title">Moneda local.</p>
         <p>
-          Saldo, pagos y recibos entre vecinos y comercios del barrio. Sin
-          stablecoins y sin promesas onchain.
+          Los miembros se acreditan y debitan entre sí. La suma de todos los
+          saldos es cero.
         </p>
         <div className="login-aside-rule" />
-        <p className="login-aside-small">Front demo · localhost:3000</p>
+        <p className="login-aside-small">demo · localhost:3000/localito</p>
       </aside>
     </main>
   );

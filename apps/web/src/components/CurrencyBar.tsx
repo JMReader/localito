@@ -7,7 +7,7 @@ export default function CurrencyBar() {
         <h2 id="currency-title" className="section-title">
           Moneda
         </h2>
-        <span className="demo-chip">sólo demo</span>
+        <span className="demo-chip">demo</span>
       </div>
 
       <div className="currency-list" role="group" aria-label="Monedas">
@@ -17,7 +17,7 @@ export default function CurrencyBar() {
           aria-pressed="true"
         >
           TL
-          <span>localito</span>
+          <span>local</span>
         </button>
         {DISABLED_CURRENCIES.map((currency) => (
           <button
@@ -33,8 +33,8 @@ export default function CurrencyBar() {
       </div>
 
       <p className="section-hint">
-        ARGt, USDT, USDC, DAI, swap y depósito están deshabilitados: esta demo
-        corre únicamente con la moneda local sobre un ledger SQLite.
+        La moneda local del circuito es TL. Sus saldos viven en el ledger de
+        demo y no están on-chain.
       </p>
     </section>
   );

@@ -1,4 +1,27 @@
-# Localito — Guía de integración del front con la API v0
+# PREStAR — integración web (v0.2)
+
+> **Estado:** propuesta pendiente de revisión de Oky y legal. No auditado, no
+> production-ready.
+>
+> La app principal (`/`) es **PREStAR**: crédito mutuo **PRt** y rampa 1:1 contra
+> una reserva de **ARGt** en **Arbitrum One (42161)**. El frontend on-chain vive
+> en `apps/web/src/components/PrestarCard.tsx` y `apps/web/src/lib/prestar.ts`.
+> Lee `balanceOfMember(address)` y el balance/allowance de ARGt; firma `pay`,
+> `onramp` y `offramp` sólo si la wallet está en chain `42161` y existe
+> `NEXT_PUBLIC_PRESTAR_CORE_ADDRESS` válida. Sin deploy configurado muestra
+> "contrato aún no desplegado" y **no** usa transfer directo de ARGt.
+>
+> Convenciones PREStAR:
+> - PRt se maneja en **centavos enteros (2 decimales)**, nunca floats.
+> - ARGt tiene **18 decimales**; `argtRaw = prtCents * 10^16` (1 PRt = 1 ARGt
+>   nominal).
+> - El saldo PRt es on-chain y firmado. Puede ser negativo por crédito.
+> - No hay mapeo alias → wallet.
+>
+> Lo que sigue documenta la **API v0 legacy** usada únicamente por `/legacy`
+> (sandbox SQLite). Sus balances **no son PRt** y no son fuente de verdad
+> on-chain. Se conserva para no romper la demo anterior.
+# Legado Localito — API v0 (sandbox SQLite)
 
 Para el front de Oky (`LemonLocalitoWallet.tsx` / `apps/web`). El contrato completo está en
 [`docs/api-contract.md`](api-contract.md). Esta guía es el mapa entre las pantallas y los

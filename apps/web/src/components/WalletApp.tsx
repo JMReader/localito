@@ -308,6 +308,9 @@ export default function WalletApp() {
           </div>
 
           <div className="topbar-actions">
+            <a className="btn btn-ghost btn-small" href="/">
+              Ir a PREStAR
+            </a>
             <span className="session-chip">
               <span className="monogram monogram-small" aria-hidden="true">
                 {monogram(participant.display_name)}
@@ -394,9 +397,9 @@ export default function WalletApp() {
 
         <footer className="footer">
           <span>
-            Localito v0 · ledger local · los saldos se leen siempre de la API
+            Localito v0 · ledger SQLite de demo · no es fuente de verdad on-chain
           </span>
-          <span>TL = 1 ARS nominal (provisional)</span>
+          <span>TL · moneda local de demo</span>
         </footer>
       </div>
     </div>

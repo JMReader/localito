@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Localito — moneda local",
+  title: "PREStAR — crédito mutuo PRt",
   description:
-    "Billetera de demo para la moneda local del barrio: saldo, pagos entre vecinos y comercios, recibo e historial.",
-  applicationName: "Localito",
+    "PREStAR: crédito mutuo local en PRt sobre Arbitrum One. Saldo firmado, pagos entre miembros y rampa 1:1 contra una reserva de ARGt. No auditado.",
+  applicationName: "PREStAR",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/icon.svg",
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "Localito",
+    title: "PREStAR",
     statusBarStyle: "default",
   },
 };

@@ -32,8 +32,8 @@ export default function BalanceCard({
         </div>
         <div className="balance-stamp" aria-hidden="true">
           <span>LOCALITO</span>
+          <span>MONEDA LOCAL</span>
           <span>DEMO</span>
-          <span>v0.1</span>
         </div>
       </div>
 
