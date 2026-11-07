@@ -1,0 +1,584 @@
+@import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap');
+@import "tailwindcss";
+
+.font-pixel {
+  font-family: 'Silkscreen', monospace, sans-serif;
+  letter-spacing: -0.04em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CRITERIALOCK // DESIGN SYSTEM TOKENS (MONOCHROME ASCII × FINTECH CRAFT)
+   Estética Blanco y Negro Puro (#000000 / #09090b / #27272a / #FFFFFF)
+   con física de resortes de Bencho.dev, Pilar (UI-01) y Costado (UI-02).
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── 1. Lienzos y Superficies Sólidas ── */
+  --bg-void: #000000;
+  --surface-carbon: #09090b;
+  --surface-elevated: #0d0d10;
+  --surface-sticky: #101014;
+  --surface-hover: #141418;
+  --surface-selected: #1c1c22;
+  --surface-dock: rgba(9, 9, 11, 0.86);
+
+  /* ── 2. Bordes Hairline de 1px & Grilla Arquitectónica ── */
+  --border-grid: #18181b;
+  --border-hairline: #27272a;
+  --border-focus: #52525b;
+  --border-pure: #ffffff;
+
+  /* ── 3. Tinta Tipográfica y Luminancia ASCII ── */
+  --ink-pure: #ffffff;
+  --ink-primary: #f4f4f5;
+  --ink-secondary: #a1a1aa;
+  --ink-muted: #52525b;
+  --ink-on-white: #000000;
+
+  /* ── 4. Color Principal del Tablero de Pinterest (Default: Segmint Cobalt #0047FF) ── */
+  --accent-primary: #0047ff;
+  --accent-bright: #3b82f6;
+  --accent-ice: #93c5fd;
+  --accent-ink: #ffffff;
+  --accent-surface: rgba(0, 71, 255, 0.14);
+  --accent-border: rgba(59, 130, 246, 0.5);
+  --accent-glow: rgba(0, 71, 255, 0.3);
+
+  /* ── 5. Micro-Indicadores Semánticos Quirúrgicos (Dots Sólidos de 6px, sin pulse decorativo R-19) ── */
+  --status-verified: #1fe05a;
+  --status-pending: #f59e0b;
+  --status-locked: #3b82f6;
+
+  /* ── 6. Curvas Físicas de Resorte y Ola (Bencho + Pilar + Costado) ── */
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-wave: cubic-bezier(0.34, 1.25, 0.64, 1);
+
+  /* ── 7. Biseles Especulares Estilo Hardware / iOS ── */
+  --bevel-ios-white: inset 0 1px 0 0 rgba(255, 255, 255, 0.95), 0 8px 24px -4px rgba(255, 255, 255, 0.22);
+  --bevel-ios-accent: inset 0 1px 0 0 rgba(255, 255, 255, 0.42), 0 10px 28px -4px var(--accent-glow);
+  --bevel-ios-dark: inset 0 1px 0 0 rgba(255, 255, 255, 0.09), 0 10px 24px -10px rgba(0, 0, 0, 0.9);
+  --shadow-card: 0 24px 48px -12px rgba(0, 0, 0, 0.95);
+}
+
+/* ── Variantes Reactivas de Color Principal del Tablero de Pinterest ── */
+[data-pinterest-theme="cobalt"] {
+  --accent-primary: #0047ff;
+  --accent-bright: #3b82f6;
+  --accent-ice: #93c5fd;
+  --accent-ink: #ffffff;
+  --accent-surface: rgba(0, 71, 255, 0.14);
+  --accent-border: rgba(59, 130, 246, 0.52);
+  --accent-glow: rgba(0, 71, 255, 0.32);
+}
+
+[data-pinterest-theme="emerald"] {
+  --accent-primary: #1fe05a;
+  --accent-bright: #34d399;
+  --accent-ice: #a7f3d0;
+  --accent-ink: #000000;
+  --accent-surface: rgba(31, 224, 90, 0.14);
+  --accent-border: rgba(52, 211, 153, 0.52);
+  --accent-glow: rgba(31, 224, 90, 0.28);
+}
+
+[data-pinterest-theme="cyan"] {
+  --accent-primary: #00d8ec;
+  --accent-bright: #22d3ee;
+  --accent-ice: #a5f3fc;
+  --accent-ink: #000000;
+  --accent-surface: rgba(0, 216, 236, 0.14);
+  --accent-border: rgba(34, 211, 238, 0.52);
+  --accent-glow: rgba(0, 216, 236, 0.28);
+}
+
+[data-pinterest-theme="amber"] {
+  --accent-primary: #f59e0b;
+  --accent-bright: #fbbf24;
+  --accent-ice: #fde68a;
+  --accent-ink: #000000;
+  --accent-surface: rgba(245, 158, 11, 0.14);
+  --accent-border: rgba(251, 191, 36, 0.52);
+  --accent-glow: rgba(245, 158, 11, 0.28);
+}
+
+[data-pinterest-theme="monochrome"] {
+  --accent-primary: #ffffff;
+  --accent-bright: #e4e4e7;
+  --accent-ice: #ffffff;
+  --accent-ink: #000000;
+  --accent-surface: rgba(255, 255, 255, 0.1);
+  --accent-border: rgba(255, 255, 255, 0.45);
+  --accent-glow: rgba(255, 255, 255, 0.2);
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: var(--bg-void);
+  color: var(--ink-primary);
+}
+
+body {
+  background-color: var(--bg-void);
+  color: var(--ink-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+/* ── Utilidades Numéricas y Tipográficas ── */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Patrón Sutil de Matriz de Puntos (Halftone Field) ── */
+.bg-halftone-grid {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1.25px);
+  background-size: 20px 20px;
+}
+
+.bg-halftone-dense {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.11) 1px, transparent 1.2px);
+  background-size: 12px 12px;
+}
+
+/* ── Biseles Táctiles iOS ── */
+.ios-bevel-white {
+  box-shadow: var(--bevel-ios-white);
+}
+
+.ios-bevel-accent {
+  box-shadow: var(--bevel-ios-accent);
+}
+
+.ios-bevel-dark {
+  box-shadow: var(--bevel-ios-dark);
+}
+
+.bg-pinterest-primary {
+  background-color: var(--accent-primary);
+  color: var(--accent-ink);
+}
+
+.text-pinterest-bright {
+  color: var(--accent-bright);
+}
+
+.text-pinterest-ice {
+  color: var(--accent-ice);
+}
+
+.border-pinterest-accent {
+  border-color: var(--accent-border);
+}
+
+.bg-pinterest-surface {
+  background-color: var(--accent-surface);
+}
+
+/* ══ Particles (Bencho.dev) ════════════════════════════════════════════════ */
+.ptc {
+  --ink: currentColor;
+  --fill-on: var(--ink);
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.ptc-canvas {
+  display: block;
+  color: var(--fill-on, var(--ink));
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* ══ ASCII wake (Bencho.dev) ═══════════════════════════════════════════════ */
+.asc {
+  --ink: currentColor;
+  --fill-on: var(--ink);
+  position: relative;
+  cursor: crosshair;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.asc-canvas {
+  display: block;
+  color: var(--fill-on, var(--ink));
+}
+
+/* ══ AsciiBlobOrb (Blobtar Biomorphic ASCII) ═══════════════════════════════ */
+.ascii-blob-orb {
+  --ink: currentColor;
+  --fill-on: var(--ink);
+  position: relative;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ascii-blob-canvas {
+  display: block;
+  color: var(--fill-on, var(--ink));
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* ══ Asset swap ════════════════════════════════════════════ */
+.swp {
+  --font-ui: var(--font-geist-sans, ui-sans-serif, system-ui, -apple-system, sans-serif);
+  --ink: var(--ink-primary);
+  --fill-on: var(--ink-primary);
+  --card: #151821;
+  --fill-slab: #151821;
+  --pane-edge: rgba(255, 255, 255, 0.09);
+  --pick: var(--status-verified);
+  --swp-r: 24px;
+  position: relative;
+  font-family: var(--font-ui);
+  color: var(--fill-on, var(--ink));
+  overflow: hidden;
+  border-radius: var(--swp-r);}
+
+.swp-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 128px;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: var(--swp-r);
+  background: var(--fill-slab, var(--card));}
+
+/* the slab that is open, or still shrinking home, is above the
+   other slab and the arrow */
+.swp-card[data-lifted] { z-index: 3; }
+
+/* what a slab shows, at the slab's resting height whatever the
+   slab is doing: amount and fiat low on the left, the label and
+   the coin pinned to the corners */
+.swp-face {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 128px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 20px 16px;}
+
+[data-stroke="on"] .swp-card { box-shadow: inset 0 0 0 1px var(--pane-edge); }
+
+.swp-top-bar {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.swp-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--fill-on, #17181a) 58%, var(--fill-slab, #ffffff));
+  letter-spacing: 0em;}
+
+.swp-amount {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;}
+
+.swp-fiat {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--fill-on, #17181a) 55%, var(--fill-slab, #ffffff));
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0em;}
+
+/* the coin sits in the slab's bottom-right corner */
+.swp-coin {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fill-on, #17181a) 8%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+  font-weight: 700;
+  /* a button now: it opens the picker */
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 160ms ease, scale 160ms ease, border-color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+  letter-spacing: 0em;}
+
+.swp-coin:hover { background: color-mix(in srgb, var(--fill-on, #17181a) 14%, transparent); border-color: rgba(255, 255, 255, 0.22); }
+
+/* on the dark fill 6% of white barely separates from the slab, so
+   the pill takes more of it there */
+[data-fill="dark"] .swp-coin { background: color-mix(in srgb, var(--fill-on, #17181a) 10%, transparent); }
+
+[data-fill="dark"] .swp-coin:hover { background: color-mix(in srgb, var(--fill-on, #17181a) 16%, transparent); }
+
+.swp-coin:active { scale: 0.96; }
+
+.swp-coin:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
+
+.swp-logo { display: block; flex: none; }
+
+/* on the seam, floating over both slabs */
+.swp-flip {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 130px; /* the middle of the gap (128px + 2px) */
+  width: 42px;
+  height: 42px;
+  margin: -21px 0 0 -21px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: #00df1a;
+  /* no shadow: a step darker than the slabs is what sets it apart */
+  background: #1d222e;
+  -webkit-tap-highlight-color: transparent;}
+
+[data-stroke="on"] .swp-flip { box-shadow: inset 0 0 0 1px rgba(0, 223, 26, 0.35), 0 4px 14px rgba(0, 0, 0, 0.6); }
+
+.swp-flip:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
+
+.swp-pick-in {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 2px;
+  padding: 8px 12px 12px;}
+
+.swp-pick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding-left: 12px;
+  margin-bottom: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: color-mix(in srgb, var(--fill-on, #17181a) 52%, var(--fill-slab, #ffffff));
+  letter-spacing: 0em;}
+
+.swp-pick-x {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  /* a solid grey, mixed from the fill's own ink and slab, rather
+     than a translucent ink — nothing shows through it */
+  color: color-mix(in srgb, var(--fill-on, var(--ink)) 50%, var(--fill-slab, var(--card)));
+  cursor: pointer;}
+
+.swp-pick-x:hover { background: color-mix(in srgb, var(--fill-on, #17181a) 6%, transparent); color: var(--fill-on, var(--ink)); }
+
+.swp-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;}
+
+.swp-pick-row:hover { background: color-mix(in srgb, var(--fill-on, #17181a) 8%, transparent); }
+
+.swp-pick-row:focus-visible { outline: 2px solid var(--pick); outline-offset: -2px; }
+
+.swp-pick-sym { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+
+.swp-pick-name { font-size: 12px; color: color-mix(in srgb, var(--fill-on, #17181a) 52%, var(--fill-slab, #ffffff)); letter-spacing: 0em; }
+
+.swp-pick-on { margin-left: 2px; flex: none; }
+
+/* ══ Animaciones Físicas de Tabla «Pilar» (UI-01) y Panel «Costado» (UI-02) ══ */
+@keyframes pi-clava {
+  0% {
+    transform: translateY(-8px) scale(1.45) rotate(-20deg);
+  }
+  45% {
+    transform: translateY(1.5px) scale(0.92) rotate(4deg);
+  }
+  70% {
+    transform: translateY(-1px) scale(1.06);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes pi-no {
+  20% {
+    transform: translateX(-5px);
+  }
+  45% {
+    transform: translateX(5px);
+  }
+  70% {
+    transform: translateX(-3px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes pi-bota {
+  30% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes co-onda {
+  0% {
+    box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0.65);
+  }
+  100% {
+    box-shadow: inset 0 0 0 22px rgba(255, 255, 255, 0);
+  }
+}
+
+.animate-pin-clava {
+  animation: pi-clava 0.7s var(--ease-out-expo);
+}
+
+.animate-shake-no {
+  animation: pi-no 0.36s var(--ease-out-expo);
+}
+
+.animate-copy-wave::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: co-onda 0.75s var(--ease-out-expo) both;
+  pointer-events: none;
+}
+
+/* Transición de densidad de filas en ola (Cascading Wave Density de Pilar) */
+.pilar-wave-row {
+  transition:
+    height 0.55s var(--ease-wave) calc(var(--row-idx, 0) * 26ms),
+    background-color 0.15s ease;
+}
+
+/* Container Queries para Maestro-Detalle de Costado */
+.costado-table-container {
+  container-type: inline-size;
+  container-name: vaultlist;
+}
+
+@container vaultlist (max-width: 780px) {
+  .col-hide-md {
+    display: none !important;
+  }
+}
+
+@container vaultlist (max-width: 620px) {
+  .col-hide-sm {
+    display: none !important;
+  }
+}
+
+/* Accesibilidad: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .pilar-wave-row,
+  .animate-pin-clava,
+  .animate-shake-no,
+  .animate-copy-wave::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCROLLBAR & TOUCH HYGIENE (PANTALLAS TÁCTILES Y EXPERIENCIA MÓVIL)
+   Oculta barras de desplazamiento visibles en WebKit, Blink, Gecko e IE/Edge,
+   preservando el desplazamiento táctil fluido (swipe/drag) y gestos con el dedo.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Clase utilitaria .no-scrollbar para cualquier contenedor con scroll */
+.no-scrollbar {
+  -ms-overflow-style: none !important; /* IE y Edge clásico */
+  scrollbar-width: none !important; /* Firefox y Chromium moderno */
+  -webkit-overflow-scrolling: touch; /* Momentum scrolling en WebKit */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* Ocultar barras de scroll en contenedores móviles/táctiles */
+.mobile-device-view,
+.mobile-device-view * {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-device-view::-webkit-scrollbar,
+.mobile-device-view *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* Regla para pantallas táctiles (desplazamiento táctil natural sin scrollbars nativas) */
+@media (hover: none), (pointer: coarse) {
+  * {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
