@@ -1,5 +1,6 @@
 "use client";
 
+import QRCode from "qrcode";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft,
@@ -632,6 +633,83 @@ function LoginScreen({
 }
 
 /* ============================================================================
+   VISTA QR — tu QR para cobrar (localito://pay?to=<alias>) + acceso a pagar
+   ============================================================================ */
+function QrView({
+  me,
+  onClose,
+  onPay,
+}: {
+  me: Participant;
+  onClose: () => void;
+  onPay: () => void;
+}) {
+  const [qrUrl, setQrUrl] = useState<string>("");
+  const payload = `localito://pay?to=${me.alias}`;
+
+  useEffect(() => {
+    let alive = true;
+    QRCode.toDataURL(payload, {
+      margin: 1,
+      width: 280,
+      color: { dark: "#090D0A", light: "#FFFFFF" },
+    })
+      .then((url) => {
+        if (alive) setQrUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [payload]);
+
+  return (
+    <div className="absolute inset-0 z-30 bg-[#0E1014] flex flex-col">
+      <header className="px-5 pt-5 pb-1 flex items-center justify-between">
+        <span className="text-sm font-bold text-white">Mi QR · cobrá en TL</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-zinc-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-6 flex flex-col items-center justify-center gap-5">
+        <div className="w-64 h-64 rounded-3xl bg-white p-4 flex items-center justify-center">
+          {qrUrl ? (
+            <img src={qrUrl} alt={`QR para pagar a ${me.alias}`} className="w-full h-full" />
+          ) : (
+            <QrCode className="w-32 h-32 text-[#090D0A]" />
+          )}
+        </div>
+
+        <div className="text-center space-y-1">
+          <div className="text-lg font-bold text-white">{me.display_name}</div>
+          <div className="font-mono text-xs text-zinc-300 bg-[#111318] py-2 px-4 rounded-full inline-block">
+            ${me.alias}
+          </div>
+        </div>
+
+        <p className="text-xs text-zinc-500 font-mono text-center">{payload}</p>
+      </div>
+
+      <div className="px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <button
+          type="button"
+          onClick={onPay}
+          className="w-full h-12 rounded-full bg-[#00DF1A] text-[#090D0A] font-bold text-sm cursor-pointer"
+        >
+          Pagar a un contacto
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
    PANTALLA PRINCIPAL LEMON CASH MOBILE — TL real contra API v0
    ============================================================================ */
 function WalletScreen({
@@ -649,7 +727,7 @@ function WalletScreen({
   const [hideBalance, setHideBalance] = useState<boolean>(false);
   const [denseMode, setDenseMode] = useState<boolean>(true);
   const [activeSheet, setActiveSheet] = useState<
-    null | "send" | "receive" | "loan" | "done"
+    null | "send" | "qr" | "loan" | "done"
   >(null);
   const [amountInput, setAmountInput] = useState<string>("0");
   const [recipients, setRecipients] = useState<Participant[]>([]);
@@ -669,7 +747,7 @@ function WalletScreen({
   const availablePesos = me.available_cents / 100;
 
   const openSheet = useCallback(
-    async (sheet: "send" | "receive" | "loan") => {
+    async (sheet: "send" | "qr" | "loan") => {
       setSendError(null);
       setLastPayment(null);
       if (sheet === "send") {
@@ -824,18 +902,18 @@ function WalletScreen({
           <div className="w-full grid grid-cols-4 gap-3 my-5">
             <button
               type="button"
-              onClick={() => openSheet("send")}
+              onClick={() => openSheet("qr")}
               className="group flex flex-col items-center gap-1.5 cursor-pointer focus-visible:outline-none"
             >
               <span className="w-14 h-14 rounded-full bg-[#00DF1A] text-[#090D0A] flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
                 <QrCode className="w-6 h-6 stroke-[2.3]" />
               </span>
-              <span className="text-xs font-semibold text-white">Pagar</span>
+              <span className="text-xs font-semibold text-white">QR</span>
             </button>
 
             <button
               type="button"
-              onClick={() => openSheet("receive")}
+              onClick={() => openSheet("qr")}
               className="group flex flex-col items-center gap-1.5 cursor-pointer focus-visible:outline-none"
             >
               <span className="w-14 h-14 rounded-full bg-[#1A1D24] border border-white/10 text-white flex items-center justify-center group-active:scale-95 transition-transform">
@@ -949,8 +1027,8 @@ function WalletScreen({
 
           <button
             type="button"
-            onClick={() => openSheet("send")}
-            aria-label="Pagar"
+            onClick={() => openSheet("qr")}
+            aria-label="Mi QR"
             className="w-12 h-12 rounded-full bg-[#00DF1A] text-[#090D0A] flex items-center justify-center shadow-md active:scale-95 transition-transform cursor-pointer"
           >
             <QrCode className="w-5 h-5 stroke-[2.4]" />
@@ -966,8 +1044,17 @@ function WalletScreen({
           </button>
         </nav>
 
+        {/* VISTA QR FULL SCREEN */}
+        {activeSheet === "qr" && (
+          <QrView
+            me={me}
+            onClose={() => setActiveSheet(null)}
+            onPay={() => openSheet("send")}
+          />
+        )}
+
         {/* 4. BOTTOM SHEETS ULTRA LIMPIOS (SIN BLOQUES DE TEXTO) */}
-        {activeSheet !== null && (
+        {activeSheet !== null && activeSheet !== "qr" && (
           <div
             className="absolute inset-0 z-30 bg-black/75 backdrop-blur-xs flex flex-col justify-end"
             onClick={(e) => {
@@ -1074,33 +1161,6 @@ function WalletScreen({
                     />
                   </>
                 )}
-              </div>
-            )}
-
-            {/* RECIBIR */}
-            {activeSheet === "receive" && (
-              <div className="max-h-[85%] overflow-y-auto rounded-t-[32px] bg-[#161920] border-t border-white/15 p-6 space-y-5 text-center">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-white">
-                    Recibir TL
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSheet(null)}
-                    aria-label="Cerrar"
-                    className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-zinc-300 cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="mx-auto w-44 h-44 rounded-3xl bg-white p-4 flex items-center justify-center">
-                  <QrCode className="w-32 h-32 text-[#090D0A]" />
-                </div>
-
-                <div className="font-mono text-xs text-zinc-300 bg-[#111318] py-2.5 px-4 rounded-full inline-block">
-                  ${me.alias} · localito://pay?to={me.alias}
-                </div>
               </div>
             )}
 
