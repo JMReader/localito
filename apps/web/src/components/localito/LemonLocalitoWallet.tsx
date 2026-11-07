@@ -961,11 +961,11 @@ export function LemonLocalitoWallet({
       <div className="relative w-full max-w-[400px] min-h-screen sm:min-h-[820px] sm:max-h-[860px] sm:rounded-[44px] bg-[#0E1014] sm:border-[6px] sm:border-[#1D2028] shadow-2xl overflow-hidden flex flex-col justify-between mobile-device-view">
         {activeTab === "pay" ? (
           <LemonPayFlow
-            userBalancePrt={coins.find((c) => c.id === "prt")?.balance || 950000}
+            userBalancePrt={coins.find((c) => c.id === "tl")?.balance || 950000}
             onPaymentSuccess={(tx) => {
               setCoins((prev) =>
                 prev.map((c) =>
-                  c.id === "prt"
+                  c.id === "tl"
                     ? { ...c, balance: Math.max(0, c.balance - tx.amount) }
                     : c
                 )
@@ -1260,7 +1260,7 @@ export function LemonLocalitoWallet({
             type="button"
             whileTap={{ scale: 0.92 }}
             onClick={() => {
-              setSelectedId("prt");
+              setSelectedId("tl");
               setActiveSheet("loan");
             }}
             aria-label="Crédito"
@@ -1325,51 +1325,14 @@ export function LemonLocalitoWallet({
                   <div className="w-9 h-1 rounded-full bg-white/20" />
                 </div>
 
-                {/* BARRA DE MODO BENCHO (CON PILL DESLIZANTE) + BOTON CERRAR */}
+                {/* HEADER LIMPIO CON TÍTULO Y BOTÓN CERRAR (ACCESIBLE SOLO DESDE PÁGINA PRINCIPAL) */}
                 {activeSheet !== "done" && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="flex-1 grid grid-cols-3 p-1 rounded-full bg-[#151821] border border-white/[0.07]">
-                      {(
-                        [
-                          { id: "send", label: "Pagar" },
-                          { id: "receive", label: "Recibir" },
-                          { id: "loan", label: "Crédito" },
-                        ] as const
-                      ).map((mode) => {
-                        const isCurrent = activeSheet === mode.id;
-                        return (
-                          <button
-                            key={mode.id}
-                            type="button"
-                            onClick={() => {
-                              setPickingRecipient(false);
-                              if (mode.id === "loan") {
-                                setSelectedId("tl");
-                              }
-                              setActiveSheet(mode.id);
-                            }}
-                            className={`relative h-8 rounded-full text-[11px] font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A] ${
-                              isCurrent
-                                ? "text-[#090D0A] font-bold"
-                                : "text-zinc-400 hover:text-white"
-                            }`}
-                          >
-                            {isCurrent && (
-                              <motion.span
-                                layoutId="bencho-sheet-mode-pill"
-                                transition={{
-                                  type: "spring",
-                                  stiffness: 440,
-                                  damping: 32,
-                                }}
-                                className="absolute inset-0 rounded-full bg-[#00DF1A] shadow-[0_2px_10px_rgba(0,223,26,0.3)]"
-                              />
-                            )}
-                            <span className="relative z-10">{mode.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    <span className="text-base font-bold text-white tracking-tight">
+                      {activeSheet === "send" && "Pagar"}
+                      {activeSheet === "receive" && "Recibir"}
+                      {activeSheet === "loan" && "Crédito"}
+                    </span>
 
                     <motion.button
                       type="button"
@@ -1379,50 +1342,10 @@ export function LemonLocalitoWallet({
                         setActiveSheet(null);
                       }}
                       aria-label="Cerrar panel"
-                      className="w-10 h-10 rounded-full bg-[#151821] border border-white/[0.08] flex items-center justify-center text-zinc-300 hover:text-white cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+                      className="w-8 h-8 rounded-full bg-[#151821] border border-white/[0.08] flex items-center justify-center text-zinc-300 hover:text-white cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
                     >
                       <X className="w-4 h-4" />
                     </motion.button>
-                  </div>
-                )}
-
-                {/* SELECTOR RAPIDO DE MONEDA ACTIVA (SOLO PARA ENVIAR / RECIBIR, NO EN CREDITO) */}
-                {activeSheet !== "done" && activeSheet !== "loan" && (
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-3 overscroll-x-contain touch-pan-x">
-                    {coins.map((c) => {
-                      const isSel = c.id === selectedId;
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => setSelectedId(c.id)}
-                          className={`relative h-8 px-2.5 rounded-full flex items-center gap-1.5 text-[11px] font-mono shrink-0 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A] ${
-                            isSel
-                              ? "text-white font-bold"
-                              : "text-zinc-400 hover:text-zinc-200 bg-[#14171F]/60 border border-white/[0.05]"
-                          }`}
-                        >
-                          {isSel && (
-                            <motion.span
-                              layoutId="sheet-coin-pill"
-                              transition={{
-                                type: "spring",
-                                stiffness: 440,
-                                damping: 32,
-                              }}
-                              className="absolute inset-0 rounded-full bg-[#1C202B] border border-white/15"
-                            />
-                          )}
-                          <span
-                            className="relative z-10 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-[#090D0A]"
-                            style={{ backgroundColor: c.accentHex }}
-                          >
-                            {c.glyph}
-                          </span>
-                          <span className="relative z-10">{c.symbol}</span>
-                        </button>
-                      );
-                    })}
                   </div>
                 )}
 
