@@ -87,6 +87,13 @@ export function getParticipants(token: string, q?: string) {
   );
 }
 
+export function getTransactions(token: string, limit = 50) {
+  return request<{ transactions: Transaction[] }>(
+    `/transactions?limit=${limit}`,
+    token
+  );
+}
+
 export function pay(
   token: string,
   to: string,

@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowLeftRight,
+  ArrowUpRight,
   Check,
   ChevronRight,
   Eye,
@@ -16,8 +17,10 @@ import {
 import {
   ApiError,
   Participant,
+  Transaction,
   getMe,
   getParticipants,
+  getTransactions,
   login,
   pay,
 } from "@/lib/api";
@@ -710,6 +713,22 @@ function QrView({
 }
 
 /* ============================================================================
+   CREDITO DEMO — perfil devuelto por /api/credit/score (simulación front-only)
+   ============================================================================ */
+interface CuitScoreProfile {
+  cuit: string;
+  razonSocial: string;
+  categoria: string;
+  scoring: number;
+  maxCreditTokens: number;
+  minCreditTokens: number;
+  tna: number;
+  suggestedTermDays: number;
+  communityVouchers: string[];
+  riskTier: "Bajo" | "Medio" | "Excelente";
+}
+
+/* ============================================================================
    PANTALLA PRINCIPAL LEMON CASH MOBILE — TL real contra API v0
    ============================================================================ */
 function WalletScreen({
@@ -740,16 +759,68 @@ function WalletScreen({
   } | null>(null);
   const idemKeyRef = useRef<string>("");
 
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loanStep, setLoanStep] = useState<"cuit" | "amount">("cuit");
+  const [loanCuit, setLoanCuit] = useState<string>("");
+  const [cuitProfile, setCuitProfile] = useState<CuitScoreProfile | null>(null);
+  const [cuitError, setCuitError] = useState<string | null>(null);
+  const [checkingScore, setCheckingScore] = useState<boolean>(false);
+  const [loanSlider, setLoanSlider] = useState<number>(250000);
+  const [loanTermDays, setLoanTermDays] = useState<30 | 60 | 90>(90);
+  const [simCredit, setSimCredit] = useState<{
+    amountCents: number;
+    termDays: number;
+    name: string;
+    createdAt: string;
+  } | null>(null);
+
   const activeCoin = COINS.find((c) => c.id === selectedId) || COINS[0];
   const isReal = !activeCoin.demo;
 
   const balancePesos = me.balance_cents / 100;
   const availablePesos = me.available_cents / 100;
+  const displayBalanceCents = me.balance_cents + (simCredit?.amountCents ?? 0);
+
+  const feedItems: Transaction[] = [
+    ...(simCredit
+      ? [
+          {
+            id: "sim-credit",
+            direction: "in" as const,
+            counterparty: {
+              alias: "credito",
+              display_name: "Préstamo TL (simulación)",
+            },
+            amount_cents: simCredit.amountCents,
+            note: `Préstamo ${simCredit.termDays}d · 0% Interés`,
+            created_at: simCredit.createdAt,
+            balance_after_cents: displayBalanceCents,
+          },
+        ]
+      : []),
+    ...transactions,
+  ];
+
+  useEffect(() => {
+    let alive = true;
+    getTransactions(token)
+      .then((r) => {
+        if (alive) setTransactions(r.transactions);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [token, me]);
 
   const openSheet = useCallback(
     async (sheet: "send" | "qr" | "loan") => {
       setSendError(null);
       setLastPayment(null);
+      if (sheet === "loan") {
+        setLoanStep(cuitProfile ? "amount" : "cuit");
+        setCuitError(null);
+      }
       if (sheet === "send") {
         setAmountInput("0");
         setRecipient(null);
@@ -763,7 +834,7 @@ function WalletScreen({
       }
       setActiveSheet(sheet);
     },
-    [token, me.id]
+    [token, me.id, cuitProfile]
   );
 
   const handleKeyPress = (k: string) => {
@@ -805,6 +876,54 @@ function WalletScreen({
     } finally {
       setSending(false);
     }
+  };
+
+  const handleCheckCuitScore = async (cuitToCheck?: string) => {
+    const raw = cuitToCheck || loanCuit;
+    if (raw.replace(/\D/g, "").length !== 11) {
+      setCuitError("El CUIT/CUIL debe contener 11 dígitos.");
+      return;
+    }
+    setCuitError(null);
+    setCheckingScore(true);
+    try {
+      const res = await fetch("/api/credit/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cuit: raw }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "No se pudo calcular el scoring.");
+      }
+      const profile = data.profile as CuitScoreProfile;
+      setCuitProfile(profile);
+      setLoanSlider(Math.min(250000, profile.maxCreditTokens));
+      setLoanTermDays((profile.suggestedTermDays as 30 | 60 | 90) || 90);
+      setLoanStep("amount");
+    } catch (e) {
+      setCuitError(
+        e instanceof Error ? e.message : "No se pudo calcular el scoring."
+      );
+    } finally {
+      setCheckingScore(false);
+    }
+  };
+
+  const handleConfirmLoan = () => {
+    if (!cuitProfile) return;
+    const amountCents = loanSlider * 100;
+    setSimCredit({
+      amountCents,
+      termDays: loanTermDays,
+      name: cuitProfile.razonSocial,
+      createdAt: new Date().toISOString(),
+    });
+    setLastPayment({
+      to: `Préstamo · ${cuitProfile.razonSocial} (simulación)`,
+      amountCents,
+    });
+    setActiveSheet("done");
   };
 
   return (
@@ -885,7 +1004,7 @@ function WalletScreen({
               {hideBalance
                 ? "••••••"
                 : isReal
-                ? formatCents(me.balance_cents)
+                ? formatCents(displayBalanceCents)
                 : "—"}
             </div>
 
@@ -995,7 +1114,7 @@ function WalletScreen({
                         ? "••••"
                         : coin.demo
                         ? "—"
-                        : formatCents(me.balance_cents)}
+                        : formatCents(displayBalanceCents)}
                     </div>
                     <div className="text-xs text-zinc-400 font-mono">
                       {hideBalance
@@ -1008,6 +1127,55 @@ function WalletScreen({
                 </button>
               );
             })}
+          </div>
+
+          {/* MOVIMIENTOS — ledger real (GET /transactions) + crédito simulado */}
+          <div className="w-full space-y-2 mt-6">
+            <p className="text-xs font-mono text-zinc-500 pb-1">MOVIMIENTOS</p>
+            {feedItems.length === 0 && (
+              <p className="text-xs text-zinc-500 font-mono py-3 text-center">
+                Todavía no hay movimientos.
+              </p>
+            )}
+            {feedItems.map((tx) => (
+              <div
+                key={tx.id}
+                className="w-full rounded-[18px] bg-[#15181F] border border-white/5 p-3.5 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                      tx.direction === "in"
+                        ? "bg-[#00DF1A]/15 text-[#00DF1A]"
+                        : "bg-white/5 text-zinc-300"
+                    }`}
+                  >
+                    {tx.direction === "in" ? (
+                      <ArrowDownLeft className="w-4 h-4" />
+                    ) : (
+                      <ArrowUpRight className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-white truncate">
+                      {tx.counterparty.display_name}
+                    </div>
+                    <div className="text-[11px] font-mono text-zinc-500 truncate">
+                      {tx.note ??
+                        new Date(tx.created_at).toLocaleDateString("es-AR")}
+                    </div>
+                  </div>
+                </div>
+                <span
+                  className={`text-sm font-bold tabular-nums shrink-0 ${
+                    tx.direction === "in" ? "text-[#00DF1A]" : "text-white"
+                  }`}
+                >
+                  {tx.direction === "in" ? "+" : "−"}
+                  {formatCents(tx.amount_cents)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -1164,12 +1332,12 @@ function WalletScreen({
               </div>
             )}
 
-            {/* CREDITO — margen real del ledger (sin desembolso en v0) */}
+            {/* CREDITO — scoring por CUIT (simulación front-only) + margen real */}
             {activeSheet === "loan" && (
-              <div className="max-h-[85%] overflow-y-auto rounded-t-[32px] bg-[#161920] border-t border-white/15 p-5 space-y-5">
+              <div className="max-h-[85%] overflow-y-auto rounded-t-[32px] bg-[#161920] border-t border-white/15 p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-white">
-                    Crédito · confianza mutua
+                    Crédito · 0% TNA
                   </span>
                   <button
                     type="button"
@@ -1181,31 +1349,236 @@ function WalletScreen({
                   </button>
                 </div>
 
-                <div className="text-center py-2 space-y-1">
-                  <div className="text-4xl font-bold tabular-nums text-[#00DF1A]">
-                    {formatCents(me.available_cents)}
+                {loanStep === "cuit" || !cuitProfile ? (
+                  <div className="space-y-3.5">
+                    <div className="rounded-[22px] bg-[#14171F] border border-white/[0.08] p-4 space-y-3">
+                      <div className="space-y-0.5">
+                        <h3 className="text-base font-bold text-white tracking-tight">
+                          Solicitud de Crédito
+                        </h3>
+                        <p className="text-xs text-zinc-400">
+                          0% TNA · Ingresá tu CUIL o CUIT para consultar tu cupo
+                          disponible.
+                        </p>
+                      </div>
+
+                      <div className="relative pt-1">
+                        <input
+                          type="text"
+                          value={loanCuit}
+                          onChange={(e) => {
+                            setLoanCuit(e.target.value);
+                            setCuitError(null);
+                          }}
+                          placeholder="CUIL / CUIT (11 dígitos)"
+                          className="w-full h-12 px-3.5 rounded-xl bg-[#0D0F14] border border-white/10 text-white font-mono text-sm tracking-wider focus:outline-none focus:border-[#CFFF2E]"
+                        />
+                        {loanCuit && (
+                          <button
+                            type="button"
+                            onClick={() => setLoanCuit("")}
+                            className="absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 text-zinc-400 hover:text-white flex items-center justify-center text-xs cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                      {cuitError && (
+                        <p className="text-xs font-mono text-red-400">
+                          {cuitError}
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                        {[
+                          { cuit: "20-38452911-4", label: "Martín Gómez (Café)" },
+                          { cuit: "30-71442119-8", label: "Panadería La Unión" },
+                          { cuit: "27-40192831-2", label: "Clara Fernández" },
+                          { cuit: "23-35112449-9", label: "Kiosco San Juan" },
+                        ].map((item) => (
+                          <button
+                            key={item.cuit}
+                            type="button"
+                            onClick={() => {
+                              setLoanCuit(item.cuit);
+                              handleCheckCuitScore(item.cuit);
+                            }}
+                            className="p-2 rounded-xl bg-[#0E1016] border border-white/[0.05] hover:border-white/20 text-left cursor-pointer transition-colors"
+                          >
+                            <div className="text-[11px] font-semibold text-white truncate">
+                              {item.label}
+                            </div>
+                            <div className="text-[10px] font-mono text-zinc-500">
+                              {item.cuit}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={checkingScore}
+                      onClick={() => handleCheckCuitScore()}
+                      className="w-full h-12 rounded-full bg-[#CFFF2E] text-[#090D0A] font-bold text-sm flex items-center justify-center gap-2 hover:brightness-105 active:scale-98 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {checkingScore ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                          <span>Consultando cupo...</span>
+                        </>
+                      ) : (
+                        <span>Consultar Cupo</span>
+                      )}
+                    </button>
                   </div>
-                  <span className="text-xs font-mono text-zinc-400 block">
-                    Margen para pagar ahora
-                  </span>
-                  <span className="text-xs font-mono text-zinc-500 block">
-                    Saldo {formatCents(me.balance_cents)} + límite{" "}
-                    {formatCents(me.credit_limit_cents)}
-                  </span>
-                </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="rounded-[20px] bg-[#14171F] border border-white/[0.08] p-3 flex items-center justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-white truncate">
+                          {cuitProfile.razonSocial}
+                        </div>
+                        <div className="text-[11px] font-mono text-zinc-400">
+                          CUIL {cuitProfile.cuit} · {cuitProfile.riskTier}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="text-[10px] font-mono text-zinc-500 block">
+                            Scoring
+                          </span>
+                          <span className="text-xs font-mono font-bold text-[#CFFF2E]">
+                            {cuitProfile.scoring} pts
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setLoanStep("cuit")}
+                          className="text-[11px] text-zinc-400 hover:text-white underline cursor-pointer"
+                        >
+                          Cambiar
+                        </button>
+                      </div>
+                    </div>
 
-                <p className="text-xs text-zinc-400 text-center">
-                  Tu saldo puede quedar negativo hasta el límite. En la demo no
-                  hay desembolso: el crédito se usa al pagar.
+                    <div className="rounded-[22px] bg-[#14171F] border border-white/[0.08] p-4 space-y-3">
+                      <div className="flex items-center justify-between text-xs text-zinc-400 font-mono">
+                        <span>Monto</span>
+                        <span>
+                          Cupo máx: {formatNumber(cuitProfile.maxCreditTokens, 0)}{" "}
+                          TL
+                        </span>
+                      </div>
+
+                      <div>
+                        <div className="text-3xl font-black text-white tabular-nums tracking-tight">
+                          {formatNumber(loanSlider, 0)}{" "}
+                          <span className="text-lg font-bold text-[#CFFF2E]">
+                            TL
+                          </span>
+                        </div>
+                        <div className="text-xs font-mono text-zinc-400 mt-0.5">
+                          ≈ $ {formatNumber(loanSlider, 0)} ARS
+                        </div>
+                      </div>
+
+                      <input
+                        type="range"
+                        min={50000}
+                        max={cuitProfile.maxCreditTokens}
+                        step={25000}
+                        value={loanSlider}
+                        onChange={(e) => setLoanSlider(parseInt(e.target.value, 10))}
+                        aria-label="Monto de crédito"
+                        className="w-full accent-[#CFFF2E] cursor-pointer"
+                      />
+
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                          { label: "25%", pct: 0.25 },
+                          { label: "50%", pct: 0.5 },
+                          { label: "75%", pct: 0.75 },
+                          { label: "Tope", pct: 1 },
+                        ].map((step) => {
+                          const targetVal = Math.max(
+                            50000,
+                            Math.round((cuitProfile.maxCreditTokens * step.pct) / 25000) * 25000
+                          );
+                          const isCurrent = Math.abs(loanSlider - targetVal) < 15000;
+                          return (
+                            <button
+                              key={step.label}
+                              type="button"
+                              onClick={() => setLoanSlider(targetVal)}
+                              className={`h-8 rounded-xl text-xs font-mono font-semibold cursor-pointer transition-colors ${
+                                isCurrent
+                                  ? "bg-[#CFFF2E] text-[#090D0A] font-bold"
+                                  : "bg-[#0D0F14] text-zinc-400 hover:text-white"
+                              }`}
+                            >
+                              {step.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[22px] bg-[#14171F] border border-white/[0.08] p-3.5 space-y-3">
+                      <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-[#0D0F14]">
+                        {([30, 60, 90] as const).map((days) => (
+                          <button
+                            key={days}
+                            type="button"
+                            onClick={() => setLoanTermDays(days)}
+                            className={`h-8 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                              loanTermDays === days
+                                ? "bg-[#1F2432] text-white font-bold"
+                                : "text-zinc-400 hover:text-zinc-200"
+                            }`}
+                          >
+                            {days} días
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-left">
+                        <div className="rounded-xl bg-[#0E1016] p-2.5">
+                          <span className="text-[10px] font-mono text-zinc-500 block">
+                            Cuota mensual
+                          </span>
+                          <span className="text-xs font-bold text-white font-mono">
+                            {formatNumber(
+                              Math.round(loanSlider / (loanTermDays / 30)),
+                              0
+                            )}{" "}
+                            TL/mes
+                          </span>
+                        </div>
+                        <div className="rounded-xl bg-[#0E1016] p-2.5">
+                          <span className="text-[10px] font-mono text-zinc-500 block">
+                            Tasa
+                          </span>
+                          <span className="text-xs font-bold text-[#CFFF2E] font-mono">
+                            0% Interés
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <SlideToConfirm
+                      label="Deslizá para solicitar"
+                      onConfirm={handleConfirmLoan}
+                    />
+                  </div>
+                )}
+
+                <p className="text-[10px] font-mono text-zinc-500 text-center">
+                  Simulación: no toca el ledger. Tu margen real es{" "}
+                  {formatCents(me.available_cents)} (saldo{" "}
+                  {formatCents(me.balance_cents)} + límite{" "}
+                  {formatCents(me.credit_limit_cents)}).
                 </p>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveSheet(null)}
-                  className="w-full h-12 rounded-full bg-[#1F232D] border border-white/10 text-white font-bold text-sm cursor-pointer"
-                >
-                  Entendido
-                </button>
               </div>
             )}
 
