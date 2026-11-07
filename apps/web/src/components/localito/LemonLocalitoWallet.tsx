@@ -30,7 +30,7 @@ import {
 
 /* ============================================================================
    ACTIVOS Y STABLECOINS (ESTILO LEMON CASH)
-   En la demo v0 solo TL es real (ledger localito en SQLite); el resto se muestra
+   En la demo v0 solo PRt es real (ledger localito en SQLite); el resto se muestra
    atenuado con sello "demo" siguiendo docs/frontend-integration.md.
    ============================================================================ */
 export interface CoinAsset {
@@ -45,10 +45,10 @@ export interface CoinAsset {
 }
 
 const TL_COIN: CoinAsset = {
-  id: "tl",
-  symbol: "TL",
-  name: "Moneda Localito",
-  glyph: "L",
+  id: "prt",
+  symbol: "PRt",
+  name: "Prestar",
+  glyph: "P",
   accentHex: "#CFFF2E",
   highlightHex: "#FFFFFF",
   shadowHex: "#4D6600",
@@ -674,7 +674,7 @@ function TxRow({ tx }: { tx: Transaction }) {
 }
 
 /* ============================================================================
-   FORMATO ARS — la API trabaja en centavos enteros; 1 TL = 1 ARS nominal.
+   FORMATO ARS — la API trabaja en centavos enteros; 1 PRt = 1 ARS nominal.
    ============================================================================ */
 const formatNumber = (n: number, decimals = 2) =>
   n.toLocaleString("es-AR", {
@@ -717,8 +717,8 @@ function LoginScreen({
       <div className="relative w-full max-w-[400px] h-dvh sm:h-[820px] sm:rounded-[44px] bg-[#0E1014] sm:border-[6px] sm:border-[#1D2028] shadow-2xl overflow-hidden flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center px-6 gap-8">
           <HighDefAsciiCoin
-            glyph="L"
-            ticker="TL"
+            glyph="P"
+            ticker="PRt"
             accentColor="#CFFF2E"
             highlightColor="#FFFFFF"
             shadowColor="#4D6600"
@@ -797,7 +797,7 @@ function QrView({
   return (
     <div className="absolute inset-0 z-30 bg-[#0E1014] flex flex-col">
       <header className="px-5 pt-5 pb-1 flex items-center justify-between">
-        <span className="text-sm font-bold text-white">Mi QR · cobrá en TL</span>
+        <span className="text-sm font-bold text-white">Mi QR · cobrá en PRt</span>
         <button
           type="button"
           onClick={onClose}
@@ -1083,7 +1083,7 @@ function PayView({
     <div className="absolute inset-0 z-30 bg-[#0E1014] flex flex-col">
       <header className="px-5 pt-5 pb-1 flex items-center justify-between">
         <span className="text-sm font-bold text-white">
-          {step === "who" ? "¿A quién le transferís?" : "Pagar en TL"}
+          {step === "who" ? "¿A quién le transferís?" : "Pagar en PRt"}
         </span>
         <button
           type="button"
@@ -1097,7 +1097,7 @@ function PayView({
 
       {!isReal ? (
         <p className="flex-1 flex items-center justify-center text-center text-sm text-zinc-400 px-8">
-          {coinSymbol} no está disponible en esta demo. Elegí TL para pagar.
+          {coinSymbol} no está disponible en esta demo. Elegí PRt para pagar.
         </p>
       ) : step === "who" ? (
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
@@ -1221,7 +1221,7 @@ function PayView({
 }
 
 /* ============================================================================
-   PANTALLA PRINCIPAL LEMON CASH MOBILE — TL real contra API v0
+   PANTALLA PRINCIPAL LEMON CASH MOBILE — PRt real contra API v0
    ============================================================================ */
 function WalletScreen({
   token,
@@ -1234,7 +1234,7 @@ function WalletScreen({
   onRefresh: (participant: Participant) => void;
   onLogout: () => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string>("tl");
+  const [selectedId, setSelectedId] = useState<string>("prt");
   const [hideBalance, setHideBalance] = useState<boolean>(false);
   const [denseMode, setDenseMode] = useState<boolean>(true);
   const [activeSheet, setActiveSheet] = useState<
@@ -1282,7 +1282,7 @@ function WalletScreen({
             direction: "in" as const,
             counterparty: {
               alias: "credito",
-              display_name: "Préstamo TL (simulación)",
+              display_name: "Préstamo PRt (simulación)",
             },
             amount_cents: simCredit.amountCents,
             note: `Préstamo ${simCredit.termDays}d · 0% Interés`,
@@ -1913,7 +1913,7 @@ function WalletScreen({
                         <span>Monto</span>
                         <span>
                           Cupo máx: {formatNumber(cuitProfile.maxCreditTokens, 0)}{" "}
-                          TL
+                          PRt
                         </span>
                       </div>
 
@@ -1921,7 +1921,7 @@ function WalletScreen({
                         <div className="text-3xl font-black text-white tabular-nums tracking-tight">
                           {formatNumber(loanSlider, 0)}{" "}
                           <span className="text-lg font-bold text-[#CFFF2E]">
-                            TL
+                            PRt
                           </span>
                         </div>
                         <div className="text-xs font-mono text-zinc-400 mt-0.5">
@@ -1998,7 +1998,7 @@ function WalletScreen({
                               Math.round(loanSlider / (loanTermDays / 30)),
                               0
                             )}{" "}
-                            TL/mes
+                            PRt/mes
                           </span>
                         </div>
                         <div className="rounded-xl bg-[#0E1016] p-2.5">
