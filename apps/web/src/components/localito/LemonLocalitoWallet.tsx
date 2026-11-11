@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowLeftRight,
+  ArrowUpRight,
   Check,
   ChevronRight,
   Eye,
@@ -16,11 +17,17 @@ import {
 import {
   ApiError,
   Participant,
+  Transaction,
+  deposit,
   getMe,
+  getMovements,
   getParticipants,
   login,
   pay,
+  resetMockData,
+  withdraw,
 } from "@/lib/api";
+import { MOCK_PARTICIPANTS } from "@/lib/mock-data";
 
 /* ============================================================================
    ACTIVOS Y STABLECOINS (ESTILO LEMON CASH)
@@ -553,8 +560,553 @@ const formatNumber = (n: number, decimals = 2) =>
 
 const formatCents = (cents: number) => `$ ${formatNumber(cents / 100, 0)}`;
 
+const SEED_BY_ALIAS = new Map(MOCK_PARTICIPANTS.map((p) => [p.alias, p]));
+
+function avatarFor(alias: string, displayName: string): string {
+  if (alias === "ars") return displayName.includes("Retiro") ? "🏧" : "🏦";
+  return SEED_BY_ALIAS.get(alias)?.avatar ?? "🙂";
+}
+
+function relativeTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000);
+  if (minutes < 1) return "Ahora";
+  const dayKey = date.toDateString();
+  if (dayKey === now.toDateString()) {
+    const clock = date.toLocaleTimeString("es-AR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    return `Hoy ${clock}`;
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (dayKey === yesterday.toDateString()) return "Ayer";
+  const days = Math.floor(minutes / 1440);
+  if (days < 7) return `Hace ${days} día${days === 1 ? "" : "s"}`;
+  return date.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+}
+
 /* ============================================================================
-   LOGIN DEMO — elegir un alias de la tabla de demo (POST /auth/demo)
+   INGRESAR / RETIRAR ARS — mismo recorrido visual de siempre; el paso final
+   acredita o debita el saldo mock y deja el movimiento en la actividad.
+   ============================================================================ */
+type FiatMode = "deposit" | "withdraw";
+type FiatStep = "amount" | "destination" | "review" | "processing" | "result";
+type WithdrawDestinationKind = "alias" | "cbu" | "cvu";
+
+const DESTINATION_KINDS: { id: WithdrawDestinationKind; label: string }[] = [
+  { id: "alias", label: "Alias" },
+  { id: "cbu", label: "CBU" },
+  { id: "cvu", label: "CVU" },
+];
+
+const UNVERIFIED_NOTE = "datos simulados · no verificados";
+
+function FiatDemoSheet({
+  mode,
+  alias,
+  balanceCents,
+  token,
+  onCommitted,
+  onClose,
+}: {
+  mode: FiatMode;
+  alias: string;
+  balanceCents: number;
+  token: string;
+  onCommitted: (participant: Participant) => void;
+  onClose: () => void;
+}) {
+  const [amount, setAmount] = useState("0");
+  const [step, setStep] = useState<FiatStep>("amount");
+  const [confirmedCents, setConfirmedCents] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [destinationKind, setDestinationKind] =
+    useState<WithdrawDestinationKind>("alias");
+  const [destinationValue, setDestinationValue] = useState("");
+  const [beneficiaryName, setBeneficiaryName] = useState("");
+  const timerRef = useRef<number | null>(null);
+
+  const isDeposit = mode === "deposit";
+  const pesos = parseFloat(amount) || 0;
+  const availablePesos = Math.floor(balanceCents / 100);
+  const overLimit = !isDeposit && pesos > availablePesos;
+  const destinationClean = destinationValue.trim();
+  const destinationDigits = destinationClean.replace(/\D/g, "");
+  const destinationValid =
+    destinationKind === "alias"
+      ? /^[a-z0-9._-]{3,32}$/i.test(destinationClean)
+      : /^\d{22}$/.test(destinationDigits);
+  const beneficiaryValid = beneficiaryName.trim().length >= 2;
+  const canLeaveAmount = pesos > 0 && !overLimit;
+  const canReview =
+    canLeaveAmount && (isDeposit || (destinationValid && beneficiaryValid));
+
+  const title = isDeposit ? "Ingresar ARS" : "Retirar ARS";
+  const origin = isDeposit
+    ? "Transferencia desde tu banco · simulada"
+    : `$${alias} · saldo TL`;
+  const destinationLabel =
+    DESTINATION_KINDS.find((k) => k.id === destinationKind)?.label ?? "Alias";
+  const destination = isDeposit
+    ? `$${alias} · saldo TL`
+    : `${destinationLabel}: ${
+        destinationKind === "alias" ? `$${destinationClean}` : destinationDigits
+      }`;
+
+  useEffect(
+    () => () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    },
+    []
+  );
+
+  const handleKey = (k: string) => {
+    setError(null);
+    if (k === "DEL") {
+      setAmount((prev) => (prev.length <= 1 ? "0" : prev.slice(0, -1)));
+      return;
+    }
+    setAmount((prev) => {
+      const next = prev === "0" ? k : `${prev}${k}`;
+      return next.length > 7 ? prev : next;
+    });
+  };
+
+  const handleDestinationChange = (value: string) => {
+    if (destinationKind === "alias") {
+      setDestinationValue(value.replace(/\s/g, "").slice(0, 32));
+      return;
+    }
+    setDestinationValue(value.replace(/\D/g, "").slice(0, 22));
+  };
+
+  const handleConfirm = () => {
+    const cents = Math.round(pesos * 100);
+    if (cents <= 0) return;
+    if (!isDeposit && cents > balanceCents) {
+      setError(`Supera tu saldo disponible (${formatCents(balanceCents)}).`);
+      setStep("amount");
+      return;
+    }
+    setError(null);
+    setConfirmedCents(cents);
+    setStep("processing");
+    timerRef.current = window.setTimeout(async () => {
+      try {
+        const result = isDeposit
+          ? await deposit(token, cents)
+          : await withdraw(token, cents);
+        onCommitted(result.participant);
+        setStep("result");
+      } catch (e) {
+        const err = e as ApiError;
+        setError(err.message ?? "No se pudo completar la operación.");
+        setStep("amount");
+      }
+    }, 1100);
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      className="max-h-[85%] overflow-y-auto rounded-t-[32px] bg-[#161920] border-t border-white/15 p-5 space-y-4"
+    >
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <span className="block text-sm font-bold text-white">{title}</span>
+          <span className="block text-[11px] font-mono text-zinc-500">
+            {step === "amount"
+              ? isDeposit
+                ? "Origen simulado → tu saldo TL"
+                : "Tu saldo TL → destino simulado"
+              : step === "destination"
+              ? "Paso 2 · destino simulado"
+              : step === "review"
+              ? "Revisá antes de confirmar"
+              : "demo · no mueve fondos reales"}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-zinc-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {step === "amount" && (
+        <>
+          <div className="text-center py-3 space-y-1">
+            <div className="text-4xl font-bold tabular-nums text-white">
+              $ {amount}
+            </div>
+            <span className="text-xs font-mono text-zinc-400">
+              ARS · TL 1:1
+            </span>
+            <span className="block text-xs font-mono text-zinc-500">
+              {isDeposit
+                ? `Se acredita a $${alias} (demo)`
+                : `Saldo disponible: ${formatCents(balanceCents)}`}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "00", "0", "DEL"].map(
+              (k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => handleKey(k)}
+                  aria-label={k === "DEL" ? "Borrar" : k}
+                  className="h-12 rounded-2xl bg-[#1F232D] active:scale-95 text-base font-bold text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+                >
+                  {k === "DEL" ? "⌫" : k}
+                </button>
+              )
+            )}
+          </div>
+
+          {(overLimit || error) && (
+            <p
+              role="alert"
+              className="text-xs text-amber-400 text-center font-mono"
+            >
+              {error ?? `Supera tu saldo disponible (${formatCents(balanceCents)}).`}
+            </p>
+          )}
+
+          {isDeposit && (
+            <div className="rounded-2xl border border-dashed border-white/15 bg-[#111318] px-4 py-3.5 flex items-start gap-3">
+              <div className="w-10 h-10 shrink-0 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-zinc-500">
+                <QrCode className="w-5 h-5" aria-hidden="true" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-zinc-200">
+                  Datos de ingreso no disponibles en esta demo
+                </p>
+                <p className="text-[11px] font-mono text-zinc-500 leading-relaxed">
+                  Acá aparecerían el CVU y el QR del proveedor (Bunny). No
+                  mostramos datos de cuenta fabricados.
+                </p>
+                <p className="text-[10px] font-mono text-amber-400">
+                  demo · sin transferencia real
+                </p>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={!canLeaveAmount}
+            onClick={() => setStep(isDeposit ? "review" : "destination")}
+            className="w-full h-12 rounded-full bg-[#00DF1A] text-[#090D0A] font-bold text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            Continuar
+          </button>
+
+          <p className="text-[11px] font-mono text-center text-zinc-500">
+            demo · no mueve fondos reales
+          </p>
+        </>
+      )}
+
+      {step === "destination" && (
+        <>
+          <div className="text-center py-1 space-y-1">
+            <div className="text-3xl font-bold tabular-nums text-white">
+              {formatCents(Math.round(pesos * 100))}
+            </div>
+            <span className="text-xs font-mono text-zinc-400">
+              saldría de tu saldo TL · demo
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <span className="block text-[10px] font-mono text-zinc-500 tracking-wide">
+                DESTINO DEL RETIRO
+              </span>
+              <div
+                className="grid grid-cols-3 gap-2"
+                role="group"
+                aria-label="Tipo de destino"
+              >
+                {DESTINATION_KINDS.map((kind) => (
+                  <button
+                    key={kind.id}
+                    type="button"
+                    aria-pressed={destinationKind === kind.id}
+                    onClick={() => {
+                      setDestinationKind(kind.id);
+                      setDestinationValue("");
+                    }}
+                    className={`h-10 rounded-full border text-xs font-bold cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A] ${
+                      destinationKind === kind.id
+                        ? "bg-[#00DF1A] text-[#090D0A] border-[#00DF1A]"
+                        : "bg-[#1F232D] text-zinc-200 border-white/10"
+                    }`}
+                  >
+                    {kind.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="withdraw-destination"
+                className="block text-[10px] font-mono text-zinc-500 tracking-wide"
+              >
+                {destinationKind === "alias"
+                  ? "ALIAS DESTINO"
+                  : `${destinationKind.toUpperCase()} DESTINO`}
+              </label>
+              <input
+                id="withdraw-destination"
+                type="text"
+                inputMode={destinationKind === "alias" ? "text" : "numeric"}
+                autoComplete="off"
+                spellCheck={false}
+                value={destinationValue}
+                onChange={(e) => handleDestinationChange(e.target.value)}
+                placeholder={
+                  destinationKind === "alias" ? "ej. ana.demobank" : "22 dígitos"
+                }
+                aria-describedby="withdraw-destination-hint"
+                className="w-full h-11 rounded-2xl bg-[#111318] border border-white/10 px-4 font-mono text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#00DF1A]"
+              />
+              <p
+                id="withdraw-destination-hint"
+                className="text-[11px] font-mono text-zinc-500"
+              >
+                {destinationKind === "alias"
+                  ? "Elegí o escribí cualquier alias de prueba."
+                  : `${destinationDigits.length}/22 dígitos · completá los 22 para continuar.`}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="withdraw-beneficiary"
+                className="block text-[10px] font-mono text-zinc-500 tracking-wide"
+              >
+                NOMBRE DEL DESTINATARIO
+              </label>
+              <input
+                id="withdraw-beneficiary"
+                type="text"
+                autoComplete="off"
+                value={beneficiaryName}
+                onChange={(e) =>
+                  setBeneficiaryName(e.target.value.slice(0, 60))
+                }
+                placeholder="ej. Ana Pérez"
+                aria-describedby="withdraw-beneficiary-hint"
+                className="w-full h-11 rounded-2xl bg-[#111318] border border-white/10 px-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#00DF1A]"
+              />
+              <p
+                id="withdraw-beneficiary-hint"
+                className="text-[11px] font-mono text-zinc-500"
+              >
+                {UNVERIFIED_NOTE}: no validamos esta cuenta ni el titular real.
+              </p>
+            </div>
+
+            {destinationKind === "alias" && (
+              <div className="flex flex-wrap gap-2">
+                {DEMO_ALIASES.map((demoAlias) => (
+                  <button
+                    key={demoAlias}
+                    type="button"
+                    onClick={() => setDestinationValue(demoAlias)}
+                    className="h-8 px-3 rounded-full bg-[#1F232D] border border-white/10 font-mono text-[11px] text-zinc-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+                  >
+                    ${demoAlias}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            disabled={!canReview}
+            onClick={() => setStep("review")}
+            className="w-full h-12 rounded-full bg-[#00DF1A] text-[#090D0A] font-bold text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            Continuar
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStep("amount")}
+            className="w-full h-11 rounded-full bg-[#1F232D] border border-white/10 text-white font-semibold text-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+          >
+            Editar monto
+          </button>
+
+          <p className="text-[11px] font-mono text-center text-zinc-500">
+            demo · {UNVERIFIED_NOTE} · no mueve fondos reales
+          </p>
+        </>
+      )}
+
+      {step === "review" && (
+        <>
+          <div className="text-center py-2 space-y-1">
+            <div className="text-4xl font-bold tabular-nums text-white">
+              {formatCents(Math.round(pesos * 100))}
+            </div>
+            <span className="text-xs font-mono text-zinc-400">
+              ARS · TL 1:1
+            </span>
+          </div>
+
+          <div className="rounded-2xl bg-[#111318] border border-white/5 divide-y divide-white/5">
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <span className="text-[10px] font-mono text-zinc-500 tracking-wide">
+                ORIGEN
+              </span>
+              <span className="text-xs text-zinc-200 text-right">
+                {origin}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <span className="text-[10px] font-mono text-zinc-500 tracking-wide">
+                DESTINO
+              </span>
+              <span className="text-xs text-zinc-200 text-right">
+                {destination}
+              </span>
+            </div>
+            {!isDeposit && (
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="text-[10px] font-mono text-zinc-500 tracking-wide">
+                  DESTINATARIO
+                </span>
+                <span className="text-xs text-zinc-200 text-right">
+                  {beneficiaryName.trim()}
+                  <span className="block text-[10px] font-mono text-amber-400">
+                    {UNVERIFIED_NOTE}
+                  </span>
+                </span>
+              </div>
+            )}
+            {isDeposit && (
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="text-[10px] font-mono text-zinc-500 tracking-wide">
+                  DATOS DEL PROVEEDOR
+                </span>
+                <span className="text-xs text-amber-400 text-right">
+                  No disponibles en esta demo
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <span className="text-[10px] font-mono text-zinc-500 tracking-wide">
+                COMISIÓN
+              </span>
+              <span className="text-xs font-mono text-[#00DF1A]">
+                $ 0 · demo
+              </span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-center text-zinc-400">
+            {isDeposit
+              ? "Se acredita a tu saldo TL de la demo."
+              : "Se debita de tu saldo TL de la demo."}{" "}
+            No se mueven fondos reales.
+            {!isDeposit && ` Destino ${UNVERIFIED_NOTE}.`}
+          </p>
+
+          <SlideToConfirm
+            label={
+              isDeposit ? "Desliza para ingresar" : "Desliza para retirar"
+            }
+            onConfirm={handleConfirm}
+          />
+
+          {!isDeposit && (
+            <button
+              type="button"
+              onClick={() => setStep("destination")}
+              className="w-full h-11 rounded-full bg-[#1F232D] border border-white/10 text-white font-semibold text-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+            >
+              Editar destino
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setStep("amount")}
+            className="w-full h-11 rounded-full bg-[#1F232D] border border-white/10 text-white font-semibold text-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+          >
+            Editar monto
+          </button>
+        </>
+      )}
+
+      {step === "processing" && (
+        <div className="py-10 flex flex-col items-center gap-4" aria-live="polite">
+          <div className="w-14 h-14 rounded-full border-2 border-[#00DF1A]/25 border-t-[#00DF1A] animate-spin" />
+          <div className="text-sm font-semibold text-white">
+            {isDeposit ? "Acreditando el ingreso…" : "Procesando el retiro…"}
+          </div>
+          <p className="text-[11px] font-mono text-zinc-500">
+            demo · no mueve fondos reales
+          </p>
+        </div>
+      )}
+
+      {step === "result" && (
+        <div className="py-4 space-y-5 text-center" aria-live="polite">
+          <div className="mx-auto w-14 h-14 rounded-full bg-[#00DF1A] text-[#090D0A] flex items-center justify-center">
+            <Check className="w-7 h-7 stroke-[2.8]" />
+          </div>
+          <div className="space-y-1">
+            <div className="text-2xl font-bold text-white">
+              {isDeposit ? "Ingreso acreditado" : "Retiro debitado"}
+            </div>
+            <p className="text-sm font-mono text-zinc-300">
+              {formatCents(confirmedCents)} ARS
+            </p>
+            <p className="text-xs text-zinc-400">
+              Tu saldo TL de la demo ya está actualizado.
+            </p>
+            {!isDeposit && (
+              <p className="text-xs font-mono text-zinc-400">
+                a {beneficiaryName.trim()} · {destination}
+              </p>
+            )}
+            <p className="text-[11px] font-mono text-zinc-500">
+              demo · no mueve fondos reales
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full h-12 rounded-full bg-[#00DF1A] text-[#090D0A] font-bold text-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            Volver
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================================
+   LOGIN DEMO — elegir un alias de la tabla de demo
    ============================================================================ */
 function LoginScreen({
   onLogin,
@@ -572,11 +1124,7 @@ function LoginScreen({
       onLogin(token, participant);
     } catch (e) {
       const err = e as ApiError;
-      setError(
-        err.code === "NETWORK_ERROR"
-          ? "No se pudo conectar con la API (¿está corriendo en :3001?)."
-          : (err.message ?? "No se pudo entrar.")
-      );
+      setError(err.message ?? "No se pudo entrar.");
       setLoading(null);
     }
   };
@@ -605,19 +1153,34 @@ function LoginScreen({
             <p className="text-xs font-mono text-zinc-500 text-center pb-1">
               ELEGÍ TU PERFIL DEMO
             </p>
-            {DEMO_ALIASES.map((alias) => (
+            {MOCK_PARTICIPANTS.map((p) => (
               <button
-                key={alias}
+                key={p.alias}
                 type="button"
                 disabled={loading !== null}
-                onClick={() => handlePick(alias)}
-                className="w-full h-14 rounded-2xl bg-[#15181F] border border-white/5 hover:bg-[#191C24] hover:border-white/15 flex items-center justify-between px-4 transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+                onClick={() => handlePick(p.alias)}
+                aria-label={`Entrar como ${p.displayName} ($${p.alias})`}
+                className="w-full h-16 rounded-2xl bg-[#15181F] border border-white/5 hover:bg-[#191C24] hover:border-white/15 flex items-center justify-between gap-3 px-4 transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
               >
-                <span className="font-mono text-sm font-bold text-white">
-                  ${alias}
+                <span className="flex items-center gap-3 min-w-0">
+                  <span
+                    aria-hidden="true"
+                    className="w-9 h-9 shrink-0 rounded-full bg-[#1F232D] border border-white/10 flex items-center justify-center text-base"
+                  >
+                    {p.avatar}
+                  </span>
+                  <span className="min-w-0 text-left">
+                    <span className="block font-mono text-sm font-bold text-white">
+                      ${p.alias}
+                    </span>
+                    <span className="block text-[11px] text-zinc-500 truncate">
+                      {p.displayName} ·{" "}
+                      {p.role === "merchant" ? "comercio" : "vecino"}
+                    </span>
+                  </span>
                 </span>
-                <span className="text-xs text-zinc-400">
-                  {loading === alias ? "Entrando…" : "Entrar"}
+                <span className="shrink-0 text-xs text-zinc-400">
+                  {loading === p.alias ? "Entrando…" : "Entrar"}
                 </span>
               </button>
             ))}
@@ -727,7 +1290,7 @@ function WalletScreen({
   const [hideBalance, setHideBalance] = useState<boolean>(false);
   const [denseMode, setDenseMode] = useState<boolean>(true);
   const [activeSheet, setActiveSheet] = useState<
-    null | "send" | "qr" | "loan" | "done"
+    null | "send" | "qr" | "loan" | "done" | "deposit" | "withdraw"
   >(null);
   const [amountInput, setAmountInput] = useState<string>("0");
   const [recipients, setRecipients] = useState<Participant[]>([]);
@@ -739,12 +1302,57 @@ function WalletScreen({
     amountCents: number;
   } | null>(null);
   const idemKeyRef = useRef<string>("");
+  const [movements, setMovements] = useState<Transaction[] | null>(null);
+  const [loadingMovements, setLoadingMovements] = useState(true);
+  const [resetting, setResetting] = useState(false);
 
   const activeCoin = COINS.find((c) => c.id === selectedId) || COINS[0];
   const isReal = !activeCoin.demo;
 
   const balancePesos = me.balance_cents / 100;
   const availablePesos = me.available_cents / 100;
+
+  const refreshActivity = useCallback(async () => {
+    try {
+      const next = await getMovements(token);
+      setMovements(next);
+    } catch {
+      // Si el store no responde, la última lista sigue siendo válida.
+    } finally {
+      setLoadingMovements(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void refreshActivity();
+  }, [refreshActivity]);
+
+  const handleFiatCommitted = useCallback(
+    (participant: Participant) => {
+      onRefresh(participant);
+      void refreshActivity();
+    },
+    [onRefresh, refreshActivity]
+  );
+
+  const handleResetDemo = async () => {
+    if (resetting) return;
+    setResetting(true);
+    resetMockData();
+    try {
+      const [fresh, nextMovements] = await Promise.all([
+        getMe(token),
+        getMovements(token),
+      ]);
+      onRefresh(fresh);
+      setMovements(nextMovements);
+      setActiveSheet(null);
+    } catch {
+      // La sesión demo sigue siendo válida: se puede reintentar.
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const openSheet = useCallback(
     async (sheet: "send" | "qr" | "loan") => {
@@ -795,7 +1403,7 @@ function WalletScreen({
         to: transaction.to.display_name,
         amountCents: transaction.amount_cents,
       });
-      const fresh = await getMe(token);
+      const [fresh] = await Promise.all([getMe(token), refreshActivity()]);
       onRefresh(fresh);
       idemKeyRef.current = "";
       setActiveSheet("done");
@@ -898,8 +1506,105 @@ function WalletScreen({
             </div>
           </div>
 
+          {/* INGRESAR / RETIRAR ARS — acreditan y debitan el saldo mock */}
+          {isReal && (
+            <div className="w-full grid grid-cols-2 gap-3 mt-4">
+              <button
+                type="button"
+                onClick={() => setActiveSheet("deposit")}
+                className="h-12 rounded-full bg-[#00DF1A] text-[#090D0A] font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <ArrowDownLeft className="w-4 h-4 stroke-[2.6]" />
+                Ingresar ARS
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSheet("withdraw")}
+                className="h-12 rounded-full bg-[#1A1D24] border border-white/10 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+              >
+                <ArrowUpRight className="w-4 h-4 text-[#00DF1A] stroke-[2.6]" />
+                Retirar ARS
+              </button>
+            </div>
+          )}
+
+          {/* ACTIVIDAD — últimos movimientos del participante */}
+          {isReal && (
+            <div className="w-full mt-5">
+              <div className="mb-2 flex items-center justify-between px-0.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                  Actividad
+                </span>
+                <span className="text-[10px] font-mono text-zinc-500">
+                  últimos movimientos
+                </span>
+              </div>
+
+              {loadingMovements && movements === null ? (
+                <ul aria-hidden="true" className="w-full space-y-2">
+                  {[0, 1, 2, 3].map((i) => (
+                    <li
+                      key={i}
+                      className="flex items-center gap-3 rounded-2xl bg-[#15181F] border border-white/5 px-3.5 py-3 animate-pulse"
+                    >
+                      <div className="w-10 h-10 shrink-0 rounded-full bg-white/5" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-3 w-28 rounded-full bg-white/5" />
+                        <div className="h-2 w-40 rounded-full bg-white/5" />
+                      </div>
+                      <div className="h-3 w-16 rounded-full bg-white/5" />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <ul aria-label="Actividad reciente" className="w-full space-y-2">
+                  {(movements ?? []).slice(0, 7).map((movement) => {
+                    const incoming = movement.direction === "in";
+                    return (
+                      <li
+                        key={movement.id}
+                        className="flex items-center gap-3 rounded-2xl bg-[#15181F] border border-white/5 px-3.5 py-3"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="w-10 h-10 shrink-0 rounded-full bg-[#1F232D] border border-white/10 flex items-center justify-center text-base"
+                        >
+                          {avatarFor(
+                            movement.counterparty.alias,
+                            movement.counterparty.display_name
+                          )}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold text-white">
+                            {movement.counterparty.display_name}
+                          </div>
+                          <div className="truncate text-[11px] font-mono text-zinc-500">
+                            {movement.note ?? (incoming ? "Ingreso" : "Pago")}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div
+                            className={`text-sm font-bold font-mono tabular-nums ${
+                              incoming ? "text-[#00DF1A]" : "text-white"
+                            }`}
+                          >
+                            {incoming ? "+" : "-"}{" "}
+                            {formatCents(movement.amount_cents)}
+                          </div>
+                          <div className="whitespace-nowrap text-[10px] font-mono text-zinc-500">
+                            {relativeTime(movement.created_at)}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+
           {/* 4 BOTONES CIRCULARES LIMPIOS (ESTILO LEMON CASH) */}
-          <div className="w-full grid grid-cols-4 gap-3 my-5">
+          <div className="w-full grid grid-cols-4 gap-3 mb-5 mt-4">
             <button
               type="button"
               onClick={() => openSheet("qr")}
@@ -1206,7 +1911,40 @@ function WalletScreen({
                 >
                   Entendido
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetDemo}
+                  disabled={resetting}
+                  aria-label="Reiniciar los datos de la demo"
+                  className="mx-auto block rounded-full px-3 py-1 text-[11px] font-mono text-zinc-500 underline decoration-white/20 underline-offset-4 hover:text-zinc-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00DF1A]"
+                >
+                  {resetting ? "Reiniciando demo…" : "Reiniciar demo"}
+                </button>
               </div>
+            )}
+
+            {/* INGRESAR / RETIRAR ARS — el paso final mueve el saldo mock */}
+            {activeSheet === "deposit" && (
+              <FiatDemoSheet
+                mode="deposit"
+                alias={me.alias}
+                balanceCents={me.balance_cents}
+                token={token}
+                onCommitted={handleFiatCommitted}
+                onClose={() => setActiveSheet(null)}
+              />
+            )}
+
+            {activeSheet === "withdraw" && (
+              <FiatDemoSheet
+                mode="withdraw"
+                alias={me.alias}
+                balanceCents={me.balance_cents}
+                token={token}
+                onCommitted={handleFiatCommitted}
+                onClose={() => setActiveSheet(null)}
+              />
             )}
 
             {/* CONFIRMACION MINIMALISTA */}
